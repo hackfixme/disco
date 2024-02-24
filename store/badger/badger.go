@@ -59,3 +59,23 @@ func (s *Badger) Set(key, value []byte) error {
 
 	return nil
 }
+
+func (s *Badger) List(prefix []byte) [][]byte {
+	txn := s.db.NewTransaction(false)
+	defer txn.Discard()
+
+	opts := badger.DefaultIteratorOptions
+	// Enable key-only iteration, which is more efficient.
+	opts.PrefetchValues = false
+
+	it := txn.NewIterator(opts)
+	defer it.Close()
+
+	keys := [][]byte{}
+	for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+		item := it.Item()
+		keys = append(keys, item.Key())
+	}
+
+	return keys
+}

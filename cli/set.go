@@ -11,12 +11,12 @@ type Set struct {
 }
 
 // Run the set command.
-func (c *Set) Run(appCtx *AppContext) error {
+func (c *Set) Run(appCtx *appContext) error {
 	if c.Namespace == "*" {
 		// TODO: Add support for the wildcard namespace. I.e. set the value in
 		// all existing namespaces. This would require keeping a registry of
 		// existing namespaces.
 		return errors.New("namespace '*' is not supported for the set command")
 	}
-	return appCtx.Store.Set(c.Namespace, []byte(c.Key), []byte(c.Value))
+	return appCtx.store.Set(c.Namespace, []byte(c.Key), []byte(c.Value))
 }

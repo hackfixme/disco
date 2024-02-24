@@ -3,6 +3,7 @@ module go.hackfix.me/disco
 go 1.22
 
 require (
+	github.com/adrg/xdg v0.4.0
 	github.com/alecthomas/kong v0.8.1
 	github.com/dgraph-io/badger/v4 v4.2.0
 	github.com/mandelsoft/vfs v0.4.3

@@ -3,7 +3,9 @@ package main
 import (
 	"log"
 	"os"
+	"path/filepath"
 
+	"github.com/adrg/xdg"
 	"github.com/alecthomas/kong"
 	"github.com/mandelsoft/vfs/pkg/osfs"
 
@@ -23,13 +25,16 @@ func main() {
 		}),
 	)
 
-	store, err := badger.Open("/tmp/badger")
-	if err != nil {
-		log.Fatal(err)
-	}
+	storePath := filepath.Join(xdg.DataHome, "disco", "store")
+	fs := osfs.New()
+	err := fs.MkdirAll(storePath, 0o700)
+	handleErr(err)
+
+	store, err := badger.Open(storePath)
+	handleErr(err)
 
 	err = ctx.Run(&cli.AppContext{
-		FS:     osfs.New(),
+		FS:     fs,
 		Env:    osEnv{},
 		Stdin:  os.Stdin,
 		Stdout: os.Stdout,
@@ -37,6 +42,12 @@ func main() {
 		Store:  store,
 	})
 	ctx.FatalIfErrorf(err)
+}
+
+func handleErr(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 type osEnv struct{}

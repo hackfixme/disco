@@ -15,8 +15,28 @@ import (
 )
 
 func main() {
+	appCtx := &cli.AppContext{
+		FS:     osfs.New(),
+		Env:    osEnv{},
+		Stdin:  os.Stdin,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+	}
+
 	var c cli.CLI
-	ctx := kong.Parse(&c,
+	defer setupCLI(&c, appCtx)()
+
+	setupStore(appCtx, c.EncryptionKey)
+}
+
+func handleErr(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func setupCLI(c *cli.CLI, appCtx *cli.AppContext) func() {
+	ctx := kong.Parse(c,
 		kong.Name("disco"),
 		kong.UsageOnError(),
 		kong.DefaultEnvars("DISCO"),
@@ -26,34 +46,25 @@ func main() {
 		}),
 	)
 
-	storePath := filepath.Join(xdg.DataHome, "disco", "store")
-	fs := osfs.New()
-	err := fs.MkdirAll(storePath, 0o700)
-	handleErr(err)
-
-	var encKey []byte
-	if len(c.EncryptionKey) > 0 {
-		encKey, err = hex.DecodeString(c.EncryptionKey)
-		handleErr(err)
+	return func() {
+		err := ctx.Run(appCtx)
+		ctx.FatalIfErrorf(err)
 	}
-	store, err := badger.Open(storePath, encKey)
-	handleErr(err)
-
-	err = ctx.Run(&cli.AppContext{
-		FS:     fs,
-		Env:    osEnv{},
-		Stdin:  os.Stdin,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
-		Store:  store,
-	})
-	ctx.FatalIfErrorf(err)
 }
 
-func handleErr(err error) {
-	if err != nil {
-		log.Fatal(err)
+func setupStore(appCtx *cli.AppContext, encKey string) {
+	storePath := filepath.Join(xdg.DataHome, "disco", "store")
+	err := appCtx.FS.MkdirAll(storePath, 0o700)
+	handleErr(err)
+
+	var encKeyDec []byte
+	if len(encKey) > 0 {
+		encKeyDec, err = hex.DecodeString(encKey)
+		handleErr(err)
 	}
+
+	appCtx.Store, err = badger.Open(storePath, encKeyDec)
+	handleErr(err)
 }
 
 type osEnv struct{}

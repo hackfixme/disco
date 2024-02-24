@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"log"
 	"os"
 	"path/filepath"
@@ -30,7 +31,12 @@ func main() {
 	err := fs.MkdirAll(storePath, 0o700)
 	handleErr(err)
 
-	store, err := badger.Open(storePath)
+	var encKey []byte
+	if len(c.EncryptionKey) > 0 {
+		encKey, err = hex.DecodeString(c.EncryptionKey)
+		handleErr(err)
+	}
+	store, err := badger.Open(storePath, encKey)
 	handleErr(err)
 
 	err = ctx.Run(&cli.AppContext{

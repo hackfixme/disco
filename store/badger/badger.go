@@ -1,6 +1,8 @@
 package badger
 
 import (
+	"time"
+
 	badger "github.com/dgraph-io/badger/v4"
 	"go.hackfix.me/disco/store"
 )
@@ -11,9 +13,16 @@ type Badger struct {
 
 var _ store.Store = &Badger{}
 
-func Open(path string) (*Badger, error) {
+func Open(path string, encryptionKey []byte) (*Badger, error) {
 	opts := badger.DefaultOptions(path)
 	opts.Logger = nil
+
+	if len(encryptionKey) > 0 {
+		opts.EncryptionKey = encryptionKey
+		opts.EncryptionKeyRotationDuration = 24 * time.Hour
+		// Should be set only if using encryption
+		opts.IndexCacheSize = 10 << 20 // 10MB
+	}
 
 	db, err := badger.Open(opts)
 	if err != nil {

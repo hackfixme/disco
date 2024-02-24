@@ -3,6 +3,7 @@ package badger
 import (
 	"bytes"
 	"fmt"
+	"slices"
 	"time"
 
 	badger "github.com/dgraph-io/badger/v4"
@@ -91,8 +92,10 @@ func (s *Badger) List(namespace string, prefix []byte) map[string][][]byte {
 		for it.Rewind(); it.Valid(); it.Next() {
 			item := it.Item()
 			ns, key, _ := bytes.Cut(item.Key(), []byte{namespaceSep})
-			if bytes.HasPrefix(key, prefix) {
-				keys[string(ns)] = append(keys[string(ns)], key)
+			// Cut returns slices of the original slice, so a copy is needed.
+			keyCopy := slices.Clone(key)
+			if bytes.HasPrefix(keyCopy, prefix) {
+				keys[string(ns)] = append(keys[string(ns)], keyCopy)
 			}
 		}
 	} else {
@@ -100,7 +103,9 @@ func (s *Badger) List(namespace string, prefix []byte) map[string][][]byte {
 		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
 			item := it.Item()
 			keyClean, _ := bytes.CutPrefix(item.Key(), namespaceKey(namespace, nil))
-			keys[namespace] = append(keys[namespace], keyClean)
+			// CutPrefix returns a slice of the original slice, so a copy is needed.
+			keyCopy := slices.Clone(keyClean)
+			keys[namespace] = append(keys[namespace], keyCopy)
 		}
 	}
 

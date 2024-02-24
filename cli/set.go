@@ -7,6 +7,6 @@ type Set struct {
 }
 
 // Run the set command.
-func (c *Set) Run() error {
-	return nil
+func (c *Set) Run(appCtx *AppContext) error {
+	return appCtx.Store.Set([]byte(c.Key), []byte(c.Value))
 }

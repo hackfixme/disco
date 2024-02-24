@@ -1,12 +1,14 @@
 package main
 
 import (
+	"log"
 	"os"
 
 	"github.com/alecthomas/kong"
 	"github.com/mandelsoft/vfs/pkg/osfs"
 
 	"go.hackfix.me/disco/cli"
+	"go.hackfix.me/disco/store/badger"
 )
 
 func main() {
@@ -21,12 +23,18 @@ func main() {
 		}),
 	)
 
-	err := ctx.Run(&cli.AppContext{
+	store, err := badger.Open("/tmp/badger")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = ctx.Run(&cli.AppContext{
 		FS:     osfs.New(),
 		Env:    osEnv{},
 		Stdin:  os.Stdin,
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
+		Store:  store,
 	})
 	ctx.FatalIfErrorf(err)
 }

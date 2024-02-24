@@ -1,15 +1,27 @@
 package cli
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 // The Get command retrieves and prints the value of a key.
 type Get struct {
 	Key string `arg:"" help:"The unique key associated with the value."`
+
+	Namespace string `default:"default" help:"The namespace to retrieve the value from."`
 }
 
 // Run the get command.
 func (c *Get) Run(appCtx *AppContext) error {
-	val, err := appCtx.Store.Get([]byte(c.Key))
+	if c.Namespace == "*" {
+		// TODO: Think about how the wildcard namespace could work for the get
+		// command. Output values for the given key in all namespaces, separated
+		// by \0?
+		return errors.New("namespace '*' is not supported for the get command")
+	}
+
+	val, err := appCtx.Store.Get(c.Namespace, []byte(c.Key))
 	if err != nil {
 		return err
 	}

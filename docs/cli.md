@@ -11,32 +11,33 @@ $ disco get myapp/mykey
 myvalue
 ```
 
+List all keys:
+```sh
+$ disco ls
+myapp/mykey
+```
+
 
 ### Namespaces
 
-- List all namespaces:
+Namespaces are created automatically when used. They are supported by the `get`,
+`set` and `ls` commands.
+
+Unless specified, the `default` namespace is used. To change this, set the value of the `DISCO_NAMESPACE` environment variable.
+
+- Set a value in a specific namespace:
   ```sh
-  $ disco ns ls
-  development
-  staging
-  production
+  $ disco set --namespace myns myapp/mykey myvalue
   ```
 
-- Create a new namespace:
+- List all keys in all namespaces:
   ```sh
-  $ disco ns add myns
+  $ disco ls --namespace='*'
+  default:myapp/mykey
+  myns:myapp/mykey
   ```
 
-- Set a value in the new namespace:
-  ```sh
-  $ disco --namespace myns set myapp/mykey myvalue
-  ```
-
-  Unless specified, the development namespace is used by default.
-  To change this, run:
-  ```sh
-  $ disco ns default myns
-  ```
+  The namespace of the key is prefixed.
 
 
 ### Roles
@@ -106,9 +107,9 @@ myvalue
 
 ### `set`
 
-### `mount`
+### `ls`
 
-### `namespace`/`ns`
+### `mount`
 
 ### `remote`
 

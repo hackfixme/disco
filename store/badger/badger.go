@@ -1,6 +1,8 @@
 package badger
 
 import (
+	"bytes"
+	"fmt"
 	"time"
 
 	badger "github.com/dgraph-io/badger/v4"
@@ -36,9 +38,11 @@ func (s *Badger) Close() error {
 	return s.db.Close()
 }
 
-func (s *Badger) Get(key []byte) ([]byte, error) {
+func (s *Badger) Get(namespace string, key []byte) ([]byte, error) {
 	txn := s.db.NewTransaction(false)
 	defer txn.Discard()
+
+	key = namespaceKey(namespace, key)
 
 	item, err := txn.Get(key)
 	if err != nil {
@@ -53,9 +57,11 @@ func (s *Badger) Get(key []byte) ([]byte, error) {
 	return val, nil
 }
 
-func (s *Badger) Set(key, value []byte) error {
+func (s *Badger) Set(namespace string, key, value []byte) error {
 	txn := s.db.NewTransaction(true)
 	defer txn.Discard()
+
+	key = namespaceKey(namespace, key)
 
 	err := txn.Set(key, value)
 	if err != nil {
@@ -69,7 +75,7 @@ func (s *Badger) Set(key, value []byte) error {
 	return nil
 }
 
-func (s *Badger) List(prefix []byte) [][]byte {
+func (s *Badger) List(namespace string, prefix []byte) map[string][][]byte {
 	txn := s.db.NewTransaction(false)
 	defer txn.Discard()
 
@@ -80,11 +86,32 @@ func (s *Badger) List(prefix []byte) [][]byte {
 	it := txn.NewIterator(opts)
 	defer it.Close()
 
-	keys := [][]byte{}
-	for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
-		item := it.Item()
-		keys = append(keys, item.Key())
+	keys := map[string][][]byte{}
+	if namespace == "*" {
+		for it.Rewind(); it.Valid(); it.Next() {
+			item := it.Item()
+			ns, key, _ := bytes.Cut(item.Key(), []byte{namespaceSep})
+			if bytes.HasPrefix(key, prefix) {
+				keys[string(ns)] = append(keys[string(ns)], key)
+			}
+		}
+	} else {
+		prefix = namespaceKey(namespace, prefix)
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			item := it.Item()
+			keyClean, _ := bytes.CutPrefix(item.Key(), namespaceKey(namespace, nil))
+			keys[namespace] = append(keys[namespace], keyClean)
+		}
 	}
 
 	return keys
+}
+
+const namespaceSep = '\x00'
+
+// namespaceKey returns a composite key used for lookup and storage for a
+// given namespace and key.
+func namespaceKey(namespace string, key []byte) []byte {
+	prefix := []byte(fmt.Sprintf("%s%c", namespace, namespaceSep))
+	return append(prefix, key...)
 }

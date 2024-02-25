@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/adrg/xdg"
+	"github.com/mandelsoft/vfs/pkg/memoryfs"
 	"github.com/mandelsoft/vfs/pkg/vfs"
 	"go.hackfix.me/disco/store"
 	"go.hackfix.me/disco/store/badger"
@@ -45,7 +46,11 @@ type appContext struct {
 func NewApp(opts ...AppOption) *App {
 	cli := &CLI{}
 	cli.setup()
-	app := &App{ctx: &appContext{}, cli: cli}
+	defaultCtx := &appContext{
+		fs: memoryfs.New(),
+	}
+
+	app := &App{ctx: defaultCtx, cli: cli}
 
 	for _, opt := range opts {
 		opt(app)
@@ -89,9 +94,15 @@ func WithFDs(stdin io.Reader, stdout, stderr io.Writer) AppOption {
 // WithStore initializes the key-value store used by the application.
 func WithStore() AppOption {
 	return func(app *App) {
-		storePath := filepath.Join(xdg.DataHome, "disco", "store")
-		err := app.ctx.fs.MkdirAll(storePath, 0o700)
-		handleErr(err)
+		var (
+			storePath string
+			err       error
+		)
+		if app.ctx.fs.Name() != "MemoryFileSystem" {
+			storePath = filepath.Join(xdg.DataHome, "disco", "store")
+			err = app.ctx.fs.MkdirAll(storePath, 0o700)
+			handleErr(err)
+		}
 
 		var encKeyDec []byte
 		if len(app.cli.EncryptionKey) > 0 {

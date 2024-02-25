@@ -27,6 +27,10 @@ func Open(path string, encryptionKey []byte) (*Badger, error) {
 		opts.IndexCacheSize = 10 << 20 // 10MB
 	}
 
+	if path == "" {
+		opts.InMemory = true
+	}
+
 	db, err := badger.Open(opts)
 	if err != nil {
 		return nil, err

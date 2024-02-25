@@ -55,6 +55,7 @@ github.com/klauspost/compress/zstd/internal/xxhash
 github.com/mandelsoft/filepath/pkg/filepath
 # github.com/mandelsoft/vfs v0.4.3
 ## explicit; go 1.19
+github.com/mandelsoft/vfs/pkg/memoryfs
 github.com/mandelsoft/vfs/pkg/osfs
 github.com/mandelsoft/vfs/pkg/projectionfs
 github.com/mandelsoft/vfs/pkg/utils

@@ -3,6 +3,8 @@ package cli
 import (
 	"fmt"
 	"slices"
+
+	"go.hackfix.me/disco/app/ctx"
 )
 
 // The LS command prints keys.
@@ -12,8 +14,8 @@ type LS struct {
 }
 
 // Run the ls command.
-func (c *LS) Run(appCtx *appContext) error {
-	keysPerNS := appCtx.store.List(c.Namespace, []byte(c.KeyPrefix))
+func (c *LS) Run(appCtx *ctx.Context) error {
+	keysPerNS := appCtx.Store.List(c.Namespace, []byte(c.KeyPrefix))
 	if len(keysPerNS) == 0 {
 		return nil
 	}
@@ -27,13 +29,13 @@ func (c *LS) Run(appCtx *appContext) error {
 
 		for _, ns := range namespaces {
 			for _, key := range keysPerNS[ns] {
-				fmt.Fprintf(appCtx.stdout, "%s:%s\n", ns, key)
+				fmt.Fprintf(appCtx.Stdout, "%s:%s\n", ns, key)
 			}
 		}
 	} else {
 		for ns := range keysPerNS {
 			for _, key := range keysPerNS[ns] {
-				fmt.Fprintf(appCtx.stdout, "%s\n", key)
+				fmt.Fprintf(appCtx.Stdout, "%s\n", key)
 			}
 		}
 	}

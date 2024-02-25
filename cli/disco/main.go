@@ -4,22 +4,23 @@ import (
 	"os"
 
 	"github.com/mandelsoft/vfs/pkg/osfs"
-	"go.hackfix.me/disco/cli"
+
+	"go.hackfix.me/disco/app"
+	"go.hackfix.me/disco/app/ctx"
 )
 
 func main() {
-	app := cli.NewApp(
-		cli.WithFS(osfs.New()),
-		cli.WithEnv(osEnv{}),
-		cli.WithFDs(os.Stdin, os.Stdout, os.Stderr),
-		cli.WithStore(),
-	)
-	app.Run()
+	app.New(
+		app.WithFS(osfs.New()),
+		app.WithEnv(osEnv{}),
+		app.WithFDs(os.Stdin, os.Stdout, os.Stderr),
+		app.WithStore(),
+	).Run()
 }
 
 type osEnv struct{}
 
-var _ cli.Environment = &osEnv{}
+var _ ctx.Environment = &osEnv{}
 
 func (e osEnv) Get(key string) string {
 	return os.Getenv(key)

@@ -4,6 +4,8 @@ import (
 	"os"
 
 	"github.com/mandelsoft/vfs/pkg/osfs"
+	"github.com/mattn/go-colorable"
+	"github.com/mattn/go-isatty"
 
 	"go.hackfix.me/disco/app"
 	"go.hackfix.me/disco/app/ctx"
@@ -11,9 +13,17 @@ import (
 
 func main() {
 	app.New(
+		app.WithFDs(
+			os.Stdin,
+			colorable.NewColorable(os.Stdout),
+			colorable.NewColorable(os.Stderr),
+		),
+		app.WithLogger(
+			isatty.IsTerminal(os.Stdout.Fd()),
+			isatty.IsTerminal(os.Stderr.Fd()),
+		),
 		app.WithFS(osfs.New()),
 		app.WithEnv(osEnv{}),
-		app.WithFDs(os.Stdin, os.Stdout, os.Stderr),
 		app.WithStore(),
 	).Run()
 }

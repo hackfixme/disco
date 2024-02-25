@@ -1,6 +1,8 @@
 package app
 
 import (
+	"log/slog"
+
 	"github.com/mandelsoft/vfs/pkg/memoryfs"
 
 	"go.hackfix.me/disco/app/cli"
@@ -18,7 +20,8 @@ func New(opts ...Option) *App {
 	cli := &cli.CLI{}
 	cli.Setup()
 	defaultCtx := &ctx.Context{
-		FS: memoryfs.New(),
+		FS:     memoryfs.New(),
+		Logger: slog.Default(),
 	}
 	app := &App{ctx: defaultCtx, cli: cli}
 

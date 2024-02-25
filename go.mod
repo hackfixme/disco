@@ -6,7 +6,10 @@ require (
 	github.com/adrg/xdg v0.4.0
 	github.com/alecthomas/kong v0.8.1
 	github.com/dgraph-io/badger/v4 v4.2.0
+	github.com/lmittmann/tint v1.0.4
 	github.com/mandelsoft/vfs v0.4.3
+	github.com/mattn/go-colorable v0.1.13
+	github.com/mattn/go-isatty v0.0.20
 )
 
 require (

@@ -50,6 +50,9 @@ github.com/klauspost/compress/fse
 github.com/klauspost/compress/huff0
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
+# github.com/lmittmann/tint v1.0.4
+## explicit; go 1.21
+github.com/lmittmann/tint
 # github.com/mandelsoft/filepath v0.0.0-20240223090642-3e2777258aa3
 ## explicit; go 1.19
 github.com/mandelsoft/filepath/pkg/filepath
@@ -60,6 +63,12 @@ github.com/mandelsoft/vfs/pkg/osfs
 github.com/mandelsoft/vfs/pkg/projectionfs
 github.com/mandelsoft/vfs/pkg/utils
 github.com/mandelsoft/vfs/pkg/vfs
+# github.com/mattn/go-colorable v0.1.13
+## explicit; go 1.15
+github.com/mattn/go-colorable
+# github.com/mattn/go-isatty v0.0.20
+## explicit; go 1.15
+github.com/mattn/go-isatty
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors

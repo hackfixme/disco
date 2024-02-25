@@ -2,6 +2,7 @@ package ctx
 
 import (
 	"io"
+	"log/slog"
 
 	"github.com/mandelsoft/vfs/pkg/vfs"
 	"go.hackfix.me/disco/store"
@@ -12,8 +13,9 @@ import (
 // data stores, process environment, etc. It is passed around the application
 // to avoid direct dependencies, and make testing easier.
 type Context struct {
-	FS  vfs.FileSystem
-	Env Environment
+	FS     vfs.FileSystem
+	Env    Environment
+	Logger *slog.Logger
 
 	// Standard streams
 	Stdin  io.Reader

@@ -13,6 +13,7 @@ import (
 
 func main() {
 	app.New(
+		app.WithExit(os.Exit),
 		app.WithFDs(
 			os.Stdin,
 			colorable.NewColorable(os.Stdout),

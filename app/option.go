@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"io"
 	"log/slog"
-	"os"
 	"path/filepath"
 
 	"github.com/adrg/xdg"
@@ -29,6 +28,13 @@ func WithFS(fs vfs.FileSystem) Option {
 func WithEnv(env ctx.Environment) Option {
 	return func(app *App) {
 		app.ctx.Env = env
+	}
+}
+
+// WithExit sets the function that stops the application.
+func WithExit(fn func(int)) Option {
+	return func(app *App) {
+		app.Exit = fn
 	}
 }
 
@@ -66,23 +72,16 @@ func WithStore() Option {
 		if app.ctx.FS.Name() != "MemoryFileSystem" {
 			storePath = filepath.Join(xdg.DataHome, "disco", "store")
 			err = app.ctx.FS.MkdirAll(storePath, 0o700)
-			handleErr(app, err)
+			app.FatalIfErrorf(err)
 		}
 
 		var encKeyDec []byte
 		if len(app.cli.EncryptionKey) > 0 {
 			encKeyDec, err = hex.DecodeString(app.cli.EncryptionKey)
-			handleErr(app, err)
+			app.FatalIfErrorf(err)
 		}
 
 		app.ctx.Store, err = badger.Open(storePath, encKeyDec)
-		handleErr(app, err)
-	}
-}
-
-func handleErr(app *App, err error) {
-	if err != nil {
-		app.ctx.Logger.Error(err.Error())
-		os.Exit(1)
+		app.FatalIfErrorf(err)
 	}
 }

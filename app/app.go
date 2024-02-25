@@ -13,17 +13,20 @@ import (
 type App struct {
 	ctx *ctx.Context
 	cli *cli.CLI
+
+	Exit func(int)
 }
 
 // New initializes a new application.
 func New(opts ...Option) *App {
 	cli := &cli.CLI{}
 	cli.Setup()
+
 	defaultCtx := &ctx.Context{
 		FS:     memoryfs.New(),
 		Logger: slog.Default(),
 	}
-	app := &App{ctx: defaultCtx, cli: cli}
+	app := &App{ctx: defaultCtx, cli: cli, Exit: func(int) {}}
 
 	for _, opt := range opts {
 		opt(app)
@@ -35,5 +38,13 @@ func New(opts ...Option) *App {
 // Run starts execution of the application.
 func (app *App) Run() {
 	err := app.cli.Ctx.Run(app.ctx)
-	app.cli.Ctx.FatalIfErrorf(err)
+	app.FatalIfErrorf(err)
+}
+
+// FatalIfErrorf terminates the application with an error message if err != nil.
+func (app *App) FatalIfErrorf(err error, args ...interface{}) {
+	if err != nil {
+		app.ctx.Logger.Error(err.Error(), args...)
+		app.Exit(1)
+	}
 }

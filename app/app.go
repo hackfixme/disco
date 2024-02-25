@@ -3,8 +3,8 @@ package app
 import (
 	"github.com/mandelsoft/vfs/pkg/memoryfs"
 
+	"go.hackfix.me/disco/app/cli"
 	"go.hackfix.me/disco/app/ctx"
-	"go.hackfix.me/disco/cli"
 )
 
 // App is the application.

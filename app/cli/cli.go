@@ -6,9 +6,10 @@ import "github.com/alecthomas/kong"
 type CLI struct {
 	Ctx *kong.Context
 
-	Get Get `kong:"cmd,help='Get the value of a key.'"`
-	Set Set `kong:"cmd,help='Set the value of a key.'"`
-	LS  LS  `kong:"cmd,help='List keys.'"`
+	Get   Get   `kong:"cmd,help='Get the value of a key.'"`
+	Set   Set   `kong:"cmd,help='Set the value of a key.'"`
+	LS    LS    `kong:"cmd,help='List keys.'"`
+	Serve Serve `kong:"cmd,help='Start the web server.'"`
 
 	EncryptionKey string `kong:"help='AES private key used for encrypting the local data store.\n It must be either 16, 24, or 32 bytes, for AES-128, AES-192 or AES-256 respectively. '"`
 }

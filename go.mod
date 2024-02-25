@@ -6,6 +6,9 @@ require (
 	github.com/adrg/xdg v0.4.0
 	github.com/alecthomas/kong v0.8.1
 	github.com/dgraph-io/badger/v4 v4.2.0
+	github.com/felixge/httpsnoop v1.0.4
+	github.com/go-chi/chi/v5 v5.0.12
+	github.com/go-chi/render v1.0.3
 	github.com/lmittmann/tint v1.0.4
 	github.com/mandelsoft/vfs v0.4.3
 	github.com/mattn/go-colorable v0.1.13
@@ -13,6 +16,7 @@ require (
 )
 
 require (
+	github.com/ajg/form v1.5.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/dgraph-io/ristretto v0.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect

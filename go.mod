@@ -13,6 +13,7 @@ require (
 	github.com/mandelsoft/vfs v0.4.3
 	github.com/mattn/go-colorable v0.1.13
 	github.com/mattn/go-isatty v0.0.20
+	golang.org/x/crypto v0.10.0
 )
 
 require (

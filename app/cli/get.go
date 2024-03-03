@@ -23,7 +23,7 @@ func (c *Get) Run(appCtx *actx.Context) error {
 		return errors.New("namespace '*' is not supported for the get command")
 	}
 
-	val, err := appCtx.Store.Get(c.Namespace, []byte(c.Key))
+	val, err := appCtx.Store.Get(c.Namespace, c.Key)
 	if err != nil {
 		return err
 	}

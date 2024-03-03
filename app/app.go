@@ -20,8 +20,9 @@ type App struct {
 // New initializes a new application.
 func New(opts ...Option) *App {
 	defaultCtx := &actx.Context{
-		Ctx:    context.Background(),
-		Logger: slog.Default(),
+		Ctx:     context.Background(),
+		Logger:  slog.Default(),
+		Version: version,
 	}
 	app := &App{ctx: defaultCtx, Exit: func(int) {}}
 

@@ -15,10 +15,11 @@ import (
 // the application to avoid direct dependencies on external systems, and make
 // testing easier.
 type Context struct {
-	Ctx    context.Context
-	FS     vfs.FileSystem
-	Env    Environment
-	Logger *slog.Logger
+	Ctx     context.Context
+	Version string
+	FS      vfs.FileSystem
+	Env     Environment
+	Logger  *slog.Logger
 
 	// Standard streams
 	Stdin  io.Reader

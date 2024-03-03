@@ -10,6 +10,7 @@ import (
 type CLI struct {
 	Ctx *kong.Context `kong:"-"`
 
+	Init  Init  `kong:"cmd,help='Initialize the data stores and generate the encryption key.'"`
 	Get   Get   `kong:"cmd,help='Get the value of a key.'"`
 	Set   Set   `kong:"cmd,help='Set the value of a key.'"`
 	LS    LS    `kong:"cmd,help='List keys.'"`

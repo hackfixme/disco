@@ -22,5 +22,5 @@ func (c *Set) Run(appCtx *actx.Context) error {
 		// existing namespaces.
 		return errors.New("namespace '*' is not supported for the set command")
 	}
-	return appCtx.Store.Set(c.Namespace, []byte(c.Key), []byte(c.Value))
+	return appCtx.Store.Set(c.Namespace, c.Key, []byte(c.Value))
 }

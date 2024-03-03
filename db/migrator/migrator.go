@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -41,24 +40,24 @@ type Migration struct {
 }
 
 // Save the migration to the database.
-func (m *Migration) Save(ctx context.Context, d types.Querier) error {
-	var id int64
-	err := d.QueryRowContext(ctx, `
-        INSERT INTO _migrations (name, up, down)
-        VALUES ($1, $2, $3);
-		`, m.Name, m.Up.V, m.Down.V).Scan(&id)
-	if err != nil {
-		return err
-	}
+// func (m *Migration) Save(ctx context.Context, d types.Querier) error {
+// 	var id int64
+// 	err := d.QueryRowContext(ctx, `
+//         INSERT INTO _migrations (name, up, down)
+//         VALUES ($1, $2, $3);
+// 		`, m.Name, m.Up.V, m.Down.V).Scan(&id)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	m.ID = id
+// 	m.ID = id
 
-	return nil
-}
+// 	return nil
+// }
 
 // LoadMigrations reads SQL files from the embedded directory, and returns a
 // slice of Migration sorted by migration name.
-func LoadMigrations(dir fs.ReadDirFS) ([]*Migration, error) {
+func LoadMigrations(dir fs.FS) ([]*Migration, error) {
 	fnameRx := regexp.MustCompile(`^(?P<name>\d{1,}-[a-z0-9-_]+)\.(?P<type>up|down)\.sql$`)
 	migrationMap := make(map[string]*Migration)
 
@@ -75,7 +74,7 @@ func LoadMigrations(dir fs.ReadDirFS) ([]*Migration, error) {
 			// TODO: Log warning
 			return nil
 		}
-		data, err := os.ReadFile(d.Name())
+		data, err := fs.ReadFile(dir, d.Name())
 		if err != nil {
 			return err
 		}
@@ -110,6 +109,7 @@ func LoadMigrations(dir fs.ReadDirFS) ([]*Migration, error) {
 }
 
 // GetMigrations returns all database migrations.
+// TODO: Remove? Migrations will be embedded in the binary.
 func GetMigrations(d types.Querier) ([]*Migration, error) {
 	ctx, cancel := context.WithCancel(d.NewContext())
 	defer cancel()
@@ -170,12 +170,61 @@ func GetMigrations(d types.Querier) ([]*Migration, error) {
 	return migrations, nil
 }
 
-// RunMigrations applies or rolls back migrations.
-func RunMigrations(d types.Querier, typ MigrationType, to string) error {
-	migrations, err := GetMigrations(d)
-	if err != nil {
-		return err
+func loadHistory(d types.Querier, migrations []*Migration) error {
+	migrationMap := make(map[string]*Migration)
+	for _, m := range migrations {
+		migrationMap[m.Name] = m
 	}
+
+	ctx, cancel := context.WithCancel(d.NewContext())
+	defer cancel()
+
+	rows, err := d.QueryContext(ctx, `SELECT name, type, time
+		FROM _migration_history
+		ORDER BY name, time;`)
+	if err != nil {
+		return fmt.Errorf("failed retrieving migration history: %w", err)
+	}
+
+	for rows.Next() {
+		var (
+			name, typ string
+			time      sql.Null[time.Time]
+		)
+		err := rows.Scan(&name, &typ, &time)
+		if err != nil {
+			return fmt.Errorf("failed reading from database: %w", err)
+		}
+
+		migration, ok := migrationMap[name]
+		if !ok {
+			return fmt.Errorf("found unknown migration in history: '%s'", name)
+		}
+		evt := MigrationEvent{
+			Type: MigrationType(typ),
+			Time: time.V,
+		}
+		migration.History = append(migration.History, evt)
+		if evt.Type == MigrationUp {
+			migration.Applied = true
+		} else {
+			migration.Applied = false
+		}
+	}
+
+	return nil
+}
+
+// RunMigrations applies or rolls back migrations.
+// to can either be a migration name, or "all".
+func RunMigrations(d types.Querier, migrations []*Migration, typ MigrationType, to string) error {
+	ctx, cancel := context.WithCancel(d.NewContext())
+	defer cancel()
+	if err := createMigrationSchema(ctx, d); err != nil {
+		return fmt.Errorf("failed creating migrations schema: %w", err)
+	}
+
+	loadHistory(d, migrations)
 
 	runPlan, err := createMigrationPlan(migrations, typ, to)
 	if err != nil {
@@ -188,9 +237,6 @@ func RunMigrations(d types.Querier, typ MigrationType, to string) error {
 		return nil
 	}
 
-	ctx, cancel := context.WithCancel(d.NewContext())
-	defer cancel()
-
 	for _, run := range runPlan {
 		_, err := d.ExecContext(ctx, run.sql)
 		if err != nil {
@@ -201,13 +247,13 @@ func RunMigrations(d types.Querier, typ MigrationType, to string) error {
 			msg = "rolled back"
 		}
 		_, err = d.ExecContext(ctx, `
-			INSERT INTO _migration_history (migration_id, type, time)
+			INSERT INTO _migration_history (name, type, time)
 			VALUES ($1, $2, $3);
-			`, run.id, string(run.typ), time.Now().UTC())
+			`, run.name, string(run.typ), time.Now().UTC())
 		if err != nil {
 			return err
 		}
-		slog.Info(fmt.Sprintf("%s DB migration", msg), "name", run.name)
+		slog.Debug(fmt.Sprintf("%s DB migration", msg), "name", run.name)
 	}
 
 	return nil
@@ -261,23 +307,10 @@ func createMigrationPlan(
 
 func createMigrationSchema(ctx context.Context, q types.Querier) error {
 	_, err := q.ExecContext(ctx, `
-		CREATE TABLE IF NOT EXISTS _migrations (
-			  id      INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY
-			, name    VARCHAR(128) UNIQUE
-            , up      TEXT
-            , down    TEXT
-		);
-		-- Postgres doesn't support CREATE TYPE IF NOT EXISTS,
-		-- or CREATE OR REPLACE TYPE.
-		DO $$ BEGIN
-			CREATE TYPE _migration_type AS ENUM ('up', 'down');
-		EXCEPTION
-			WHEN duplicate_object THEN null;
-		END $$;
 		CREATE TABLE IF NOT EXISTS _migration_history (
-            migration_id   INTEGER NOT NULL REFERENCES _migrations,
-            type           _migration_type NOT NULL,
-			time           timestamp NOT NULL
+			name   VARCHAR(128),
+            type   VARCHAR(32) CHECK( type IN ('up','down') ) NOT NULL,
+			time   TIMESTAMP NOT NULL
 		);`)
 	return err
 }

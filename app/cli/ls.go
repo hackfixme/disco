@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"slices"
 
-	"go.hackfix.me/disco/app/ctx"
+	actx "go.hackfix.me/disco/app/context"
 )
 
 // The LS command prints keys.
@@ -14,7 +14,7 @@ type LS struct {
 }
 
 // Run the ls command.
-func (c *LS) Run(appCtx *ctx.Context) error {
+func (c *LS) Run(appCtx *actx.Context) error {
 	keysPerNS := appCtx.Store.List(c.Namespace, []byte(c.KeyPrefix))
 	if len(keysPerNS) == 0 {
 		return nil

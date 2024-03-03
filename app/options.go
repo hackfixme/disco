@@ -1,31 +1,45 @@
 package app
 
 import (
-	"encoding/hex"
+	"context"
 	"io"
 	"log/slog"
 	"path/filepath"
 
-	"github.com/adrg/xdg"
 	"github.com/lmittmann/tint"
 	"github.com/mandelsoft/vfs/pkg/vfs"
 
-	"go.hackfix.me/disco/app/ctx"
-	"go.hackfix.me/disco/db/store/badger"
+	actx "go.hackfix.me/disco/app/context"
+	"go.hackfix.me/disco/db"
+	"go.hackfix.me/disco/db/store/sqlite"
 )
 
 // Option is a function that allows configuring the application.
 type Option func(*App)
 
-// WithFS sets the filesystem used by the application.
-func WithFS(fs vfs.FileSystem) Option {
+// WithArgs sets the command arguments passed to the CLI parser.
+func WithArgs(args []string) Option {
 	return func(app *App) {
-		app.ctx.FS = fs
+		app.args = args
+	}
+}
+
+// WithDB initializes the database used by the application.
+func WithDB(dataDir string) Option {
+	return func(app *App) {
+		dbCtx, _ := context.WithCancel(app.ctx.Ctx)
+		dbPath := dataDir
+		if dbPath != ":memory:" {
+			dbPath = filepath.Join(dataDir, "disco.db")
+		}
+		var err error
+		app.ctx.DB, err = db.Open(dbCtx, dbPath)
+		app.FatalIfErrorf(err)
 	}
 }
 
 // WithEnv sets the process environment used by the application.
-func WithEnv(env ctx.Environment) Option {
+func WithEnv(env actx.Environment) Option {
 	return func(app *App) {
 		app.ctx.Env = env
 	}
@@ -47,6 +61,13 @@ func WithFDs(stdin io.Reader, stdout, stderr io.Writer) Option {
 	}
 }
 
+// WithFS sets the filesystem used by the application.
+func WithFS(fs vfs.FileSystem) Option {
+	return func(app *App) {
+		app.ctx.FS = fs
+	}
+}
+
 // WithLogger initializes the logger used by the application.
 func WithLogger(isStdoutTTY, isStderrTTY bool) Option {
 	return func(app *App) {
@@ -63,25 +84,15 @@ func WithLogger(isStdoutTTY, isStderrTTY bool) Option {
 }
 
 // WithStore initializes the key-value store used by the application.
-func WithStore() Option {
+func WithStore(dataDir string) Option {
 	return func(app *App) {
-		var (
-			storePath string
-			err       error
-		)
-		if app.ctx.FS.Name() != "MemoryFileSystem" {
-			storePath = filepath.Join(xdg.DataHome, "disco", "store")
-			err = app.ctx.FS.MkdirAll(storePath, 0o700)
-			app.FatalIfErrorf(err)
+		storeCtx, _ := context.WithCancel(app.ctx.Ctx)
+		storePath := dataDir
+		if storePath != ":memory:" {
+			storePath = filepath.Join(dataDir, "store.db")
 		}
-
-		var encKeyDec []byte
-		if len(app.cli.EncryptionKey) > 0 {
-			encKeyDec, err = hex.DecodeString(app.cli.EncryptionKey)
-			app.FatalIfErrorf(err)
-		}
-
-		app.ctx.Store, err = badger.Open(storePath, encKeyDec)
+		var err error
+		app.ctx.Store, err = sqlite.Open(storeCtx, storePath)
 		app.FatalIfErrorf(err)
 	}
 }

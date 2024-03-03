@@ -1,36 +1,42 @@
 package app
 
 import (
+	"context"
 	"log/slog"
 
-	"github.com/mandelsoft/vfs/pkg/memoryfs"
-
 	"go.hackfix.me/disco/app/cli"
-	"go.hackfix.me/disco/app/ctx"
+	actx "go.hackfix.me/disco/app/context"
 )
 
 // App is the application.
 type App struct {
-	ctx *ctx.Context
-	cli *cli.CLI
+	ctx  *actx.Context
+	cli  *cli.CLI
+	args []string
 
 	Exit func(int)
 }
 
 // New initializes a new application.
 func New(opts ...Option) *App {
-	cli := &cli.CLI{}
-	cli.Setup()
-
-	defaultCtx := &ctx.Context{
-		FS:     memoryfs.New(),
+	defaultCtx := &actx.Context{
+		Ctx:    context.Background(),
 		Logger: slog.Default(),
 	}
-	app := &App{ctx: defaultCtx, cli: cli, Exit: func(int) {}}
+	app := &App{ctx: defaultCtx, Exit: func(int) {}}
 
 	for _, opt := range opts {
 		opt(app)
 	}
+
+	slog.SetDefault(app.ctx.Logger)
+
+	cli := &cli.CLI{}
+	err := cli.Setup(app.ctx, app.args, app.Exit)
+	if err != nil {
+		app.FatalIfErrorf(err)
+	}
+	app.cli = cli
 
 	return app
 }

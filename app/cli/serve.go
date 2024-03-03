@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"go.hackfix.me/disco/app/ctx"
+	actx "go.hackfix.me/disco/app/context"
 	"go.hackfix.me/disco/web"
 )
 
@@ -11,7 +11,7 @@ type Serve struct {
 }
 
 // Run the serve command.
-func (s *Serve) Run(appCtx *ctx.Context) error {
+func (s *Serve) Run(appCtx *actx.Context) error {
 	srv := web.NewServer(appCtx, s.Address)
 	// TODO: Handle graceful shutdown.
 	// See https://dev.to/mokiat/proper-http-shutdown-in-go-3fji

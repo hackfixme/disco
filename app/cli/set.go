@@ -3,7 +3,7 @@ package cli
 import (
 	"errors"
 
-	"go.hackfix.me/disco/app/ctx"
+	actx "go.hackfix.me/disco/app/context"
 )
 
 // The Set command stores the value of a key.
@@ -15,7 +15,7 @@ type Set struct {
 }
 
 // Run the set command.
-func (c *Set) Run(appCtx *ctx.Context) error {
+func (c *Set) Run(appCtx *actx.Context) error {
 	if c.Namespace == "*" {
 		// TODO: Add support for the wildcard namespace. I.e. set the value in
 		// all existing namespaces. This would require keeping a registry of

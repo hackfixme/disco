@@ -4,16 +4,16 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 
-	"go.hackfix.me/disco/app/ctx"
+	actx "go.hackfix.me/disco/app/context"
 )
 
 // Handler is the API endpoint handler.
 type Handler struct {
-	appCtx *ctx.Context
+	appCtx *actx.Context
 }
 
 // Router returns the API router.
-func Router(appCtx *ctx.Context) chi.Router {
+func Router(appCtx *actx.Context) chi.Router {
 	r := chi.NewRouter()
 	r.Use(render.SetContentType(render.ContentTypeJSON))
 

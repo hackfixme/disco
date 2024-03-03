@@ -1,10 +1,14 @@
 package cli
 
-import "github.com/alecthomas/kong"
+import (
+	"github.com/alecthomas/kong"
+
+	actx "go.hackfix.me/disco/app/context"
+)
 
 // CLI is the command line interface of disco.
 type CLI struct {
-	Ctx *kong.Context
+	Ctx *kong.Context `kong:"-"`
 
 	Get   Get   `kong:"cmd,help='Get the value of a key.'"`
 	Set   Set   `kong:"cmd,help='Set the value of a key.'"`
@@ -15,14 +19,30 @@ type CLI struct {
 }
 
 // Setup the command-line interface.
-func (c *CLI) Setup() {
-	c.Ctx = kong.Parse(c,
+func (c *CLI) Setup(appCtx *actx.Context, args []string, exitFn func(int)) error {
+	kparser, err := kong.New(c,
 		kong.Name("disco"),
 		kong.UsageOnError(),
 		kong.DefaultEnvars("DISCO"),
+		kong.Exit(exitFn),
 		kong.ConfigureHelp(kong.HelpOptions{
 			Compact: true,
 			Summary: true,
 		}),
 	)
+	if err != nil {
+		return err
+	}
+
+	kparser.Stdout = appCtx.Stdout
+	kparser.Stderr = appCtx.Stderr
+
+	ctx, err := kparser.Parse(args)
+	if err != nil {
+		return err
+	}
+
+	c.Ctx = ctx
+
+	return nil
 }

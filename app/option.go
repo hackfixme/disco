@@ -11,7 +11,7 @@ import (
 	"github.com/mandelsoft/vfs/pkg/vfs"
 
 	"go.hackfix.me/disco/app/ctx"
-	"go.hackfix.me/disco/store/badger"
+	"go.hackfix.me/disco/db/store/badger"
 )
 
 // Option is a function that allows configuring the application.

@@ -7,7 +7,8 @@ import (
 	"time"
 
 	badger "github.com/dgraph-io/badger/v4"
-	"go.hackfix.me/disco/store"
+
+	"go.hackfix.me/disco/db/store"
 )
 
 type Badger struct {

@@ -5,7 +5,8 @@ import (
 	"log/slog"
 
 	"github.com/mandelsoft/vfs/pkg/vfs"
-	"go.hackfix.me/disco/store"
+
+	"go.hackfix.me/disco/db/store"
 )
 
 // Context contains common objects used by the application. Most of them are

@@ -10,7 +10,6 @@ import (
 	"github.com/mandelsoft/vfs/pkg/vfs"
 
 	actx "go.hackfix.me/disco/app/context"
-	"go.hackfix.me/disco/crypto"
 	"go.hackfix.me/disco/db"
 	"go.hackfix.me/disco/db/store/sqlite"
 )
@@ -93,14 +92,19 @@ func WithStore(dataDir string) Option {
 			storePath = filepath.Join(dataDir, "store.db")
 		}
 
-		encKeyHex := app.ctx.Env.Get("DISCO_ENCRYPTION_KEY")
-		encKey, err := crypto.DecodeHexKey(encKeyHex)
-		if err != nil && len(app.args) > 0 && (app.args[0] == "get" ||
-			app.args[0] == "set" || app.args[0] == "serve") {
-			app.FatalIfErrorf(err, "Failed reading encryption key")
+		mustValidEncKey := len(app.args) > 0 && (app.args[0] == "get" ||
+			app.args[0] == "set" || app.args[0] == "serve")
+
+		storeOpts := []sqlite.Option{}
+		if mustValidEncKey {
+			storeOpts = append(storeOpts, sqlite.WithEncryptionKey(
+				app.ctx.Env.Get("DISCO_ENCRYPTION_KEY")))
 		}
 
-		app.ctx.Store, err = sqlite.Open(storeCtx, storePath, encKey)
-		app.FatalIfErrorf(err)
+		var err error
+		app.ctx.Store, err = sqlite.Open(storeCtx, storePath, storeOpts...)
+		if err != nil {
+			app.FatalIfErrorf(err)
+		}
 	}
 }

@@ -39,22 +39,6 @@ type Migration struct {
 	Down    sql.Null[string]
 }
 
-// Save the migration to the database.
-// func (m *Migration) Save(ctx context.Context, d types.Querier) error {
-// 	var id int64
-// 	err := d.QueryRowContext(ctx, `
-//         INSERT INTO _migrations (name, up, down)
-//         VALUES ($1, $2, $3);
-// 		`, m.Name, m.Up.V, m.Down.V).Scan(&id)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	m.ID = id
-
-// 	return nil
-// }
-
 // LoadMigrations reads SQL files from the embedded directory, and returns a
 // slice of Migration sorted by migration name.
 func LoadMigrations(dir fs.FS) ([]*Migration, error) {
@@ -103,68 +87,6 @@ func LoadMigrations(dir fs.FS) ([]*Migration, error) {
 	migrations := make([]*Migration, 0, len(migrationMap))
 	for _, mName := range mKeys {
 		migrations = append(migrations, migrationMap[mName])
-	}
-
-	return migrations, nil
-}
-
-// GetMigrations returns all database migrations.
-// TODO: Remove? Migrations will be embedded in the binary.
-func GetMigrations(d types.Querier) ([]*Migration, error) {
-	ctx, cancel := context.WithCancel(d.NewContext())
-	defer cancel()
-	if err := createMigrationSchema(ctx, d); err != nil {
-		return nil, fmt.Errorf("failed creating migrations schema: %w", err)
-	}
-
-	rows, err := d.QueryContext(ctx, `
-		SELECT m.id, m.name, m.up, m.down, mh.type, mh.time
-		FROM _migrations AS m
-		LEFT JOIN _migration_history AS mh ON m.id = mh.migration_id
-		ORDER BY m.name, mh.time;
-	`)
-	if err != nil {
-		return nil, fmt.Errorf("failed retrieving migrations: %w", err)
-	}
-
-	migrations := []*Migration{}
-	type mRow struct {
-		ID       int64
-		Name     string
-		Up, Down sql.Null[string]
-		Type     sql.Null[string]
-		Time     sql.Null[time.Time]
-	}
-
-	var migration *Migration
-	for rows.Next() {
-		row := mRow{}
-		err := rows.Scan(&row.ID, &row.Name, &row.Up, &row.Down, &row.Type, &row.Time)
-		if err != nil {
-			return nil, fmt.Errorf("failed reading from database: %w", err)
-		}
-		if migration == nil || migration.Name != row.Name {
-			migration = &Migration{
-				ID:   row.ID,
-				Name: row.Name,
-				Up:   row.Up,
-				Down: row.Down,
-			}
-			migrations = append(migrations, migration)
-		}
-
-		if row.Type.V != "" {
-			evt := MigrationEvent{
-				Type: MigrationType(row.Type.V),
-				Time: row.Time.V,
-			}
-			migration.History = append(migration.History, evt)
-			if evt.Type == MigrationUp {
-				migration.Applied = true
-			} else {
-				migration.Applied = false
-			}
-		}
 	}
 
 	return migrations, nil

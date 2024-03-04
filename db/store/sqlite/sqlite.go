@@ -4,9 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"encoding/hex"
+	"errors"
 	"io/fs"
 
+	"go.hackfix.me/disco/crypto"
 	"go.hackfix.me/disco/db/migrator"
+	"go.hackfix.me/disco/db/queries"
 	"go.hackfix.me/disco/db/store"
 	"go.hackfix.me/disco/db/types"
 )
@@ -17,18 +21,23 @@ var migrationsFS embed.FS
 type Store struct {
 	*sql.DB
 	ctx        context.Context
+	encKey     *[32]byte
 	migrations []*migrator.Migration
 }
 
 var _ store.Store = &Store{}
 
-func Open(ctx context.Context, path string) (*Store, error) {
+func Open(ctx context.Context, path string, encKey *[32]byte) (*Store, error) {
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, err
 	}
 
 	d := &Store{DB: db, ctx: ctx}
+	if !validEncryptionKey(ctx, d.AsQuerier(), encKey) {
+		return nil, errors.New("invalid encryption key")
+	}
+	d.encKey = encKey
 
 	migrationsDir, err := fs.Sub(migrationsFS, "migrations")
 	if err != nil {
@@ -41,6 +50,18 @@ func Open(ctx context.Context, path string) (*Store, error) {
 	d.migrations = migrations
 
 	return d, nil
+}
+
+func validEncryptionKey(ctx context.Context, d types.Querier, encKey *[32]byte) bool {
+	existingKeyHash, err := queries.GetEncryptionKeyHash(ctx, d)
+	if err != nil || !existingKeyHash.Valid {
+		return false
+	}
+
+	keyHash := crypto.Hash("encryption key hash", encKey[:])
+	keyHashHex := hex.EncodeToString(keyHash)
+
+	return existingKeyHash.V == keyHashHex
 }
 
 func (s *Store) Get(namespace, key string) (value []byte, err error) {

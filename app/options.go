@@ -10,6 +10,7 @@ import (
 	"github.com/mandelsoft/vfs/pkg/vfs"
 
 	actx "go.hackfix.me/disco/app/context"
+	"go.hackfix.me/disco/crypto"
 	"go.hackfix.me/disco/db"
 	"go.hackfix.me/disco/db/store/sqlite"
 )
@@ -91,8 +92,15 @@ func WithStore(dataDir string) Option {
 		if storePath != ":memory:" {
 			storePath = filepath.Join(dataDir, "store.db")
 		}
-		var err error
-		app.ctx.Store, err = sqlite.Open(storeCtx, storePath)
+
+		encKeyHex := app.ctx.Env.Get("DISCO_ENCRYPTION_KEY")
+		encKey, err := crypto.DecodeHexKey(encKeyHex)
+		if err != nil && len(app.args) > 0 && (app.args[0] == "get" ||
+			app.args[0] == "set" || app.args[0] == "serve") {
+			app.FatalIfErrorf(err, "Failed reading encryption key")
+		}
+
+		app.ctx.Store, err = sqlite.Open(storeCtx, storePath, encKey)
 		app.FatalIfErrorf(err)
 	}
 }

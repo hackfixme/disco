@@ -16,7 +16,9 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 )
 
@@ -29,6 +31,22 @@ func NewEncryptionKey() *[32]byte {
 		panic(err)
 	}
 	return &key
+}
+
+// DecodeHexKey validates and decodes an encryption key.
+func DecodeHexKey(hexKey string) (*[32]byte, error) {
+	keyDec, err := hex.DecodeString(hexKey)
+	if err != nil {
+		return nil, err
+	}
+	if len(keyDec) != 32 {
+		return nil, fmt.Errorf("expected key length of 32; got %d", len(keyDec))
+	}
+
+	var key [32]byte
+	copy(key[:], keyDec)
+
+	return &key, nil
 }
 
 // Encrypt encrypts data using 256-bit AES-GCM.  This both hides the content of

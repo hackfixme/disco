@@ -41,7 +41,7 @@ func (c *Init) Run(appCtx *actx.Context) error {
 
 	if sqlStore, ok := appCtx.Store.(*sqlite.Store); ok {
 		storeMigrations := sqlStore.Migrations()
-		err = migrator.RunMigrations(sqlStore.AsQuerier(), storeMigrations, migrator.MigrationUp, "all")
+		err = migrator.RunMigrations(sqlStore, storeMigrations, migrator.MigrationUp, "all")
 		if err != nil {
 			return err
 		}

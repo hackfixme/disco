@@ -14,7 +14,7 @@ type Option func(*Store) error
 // WithEncryptionKey validates and sets the store encryption key.
 func WithEncryptionKey(key string) Option {
 	return func(s *Store) error {
-		existingKeyHash, err := queries.GetEncryptionKeyHash(s.ctx, s.AsQuerier())
+		existingKeyHash, err := queries.GetEncryptionKeyHash(s.ctx, s)
 		if err != nil || !existingKeyHash.Valid {
 			return aerrors.NewRuntimeError("missing encryption key", nil,
 				"Did you forget to run 'disco init'?")

@@ -102,7 +102,11 @@ func (h *Handler) StoreKeys(w http.ResponseWriter, r *http.Request) {
 		req.Namespace = ns
 	}
 
-	nsKeys := h.appCtx.Store.List(req.Namespace, req.Prefix)
+	nsKeys, err := h.appCtx.Store.List(req.Namespace, req.Prefix)
+	if err != nil {
+		_ = render.Render(w, r, lib.ErrInternal(err))
+		return
+	}
 
 	resp := &StoreKeysResponse{
 		Response: &lib.Response{StatusCode: http.StatusOK},

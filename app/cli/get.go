@@ -28,7 +28,9 @@ func (c *Get) Run(appCtx *actx.Context) error {
 		return err
 	}
 
-	fmt.Fprintf(appCtx.Stdout, "%s\n", val)
+	if len(val) > 0 {
+		fmt.Fprintf(appCtx.Stdout, "%s\n", val)
+	}
 
 	return nil
 }

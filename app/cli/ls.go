@@ -15,7 +15,10 @@ type LS struct {
 
 // Run the ls command.
 func (c *LS) Run(appCtx *actx.Context) error {
-	keysPerNS := appCtx.Store.List(c.Namespace, c.KeyPrefix)
+	keysPerNS, err := appCtx.Store.List(c.Namespace, c.KeyPrefix)
+	if err != nil {
+		return err
+	}
 	if len(keysPerNS) == 0 {
 		return nil
 	}

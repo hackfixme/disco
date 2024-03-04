@@ -6,5 +6,5 @@ type Store interface {
 	Close() error
 	Get(namespace, key string) (value []byte, err error)
 	Set(namespace, key string, value []byte) error
-	List(namespace, prefix string) map[string][][]byte
+	List(namespace, keyPrefix string) (map[string][]string, error)
 }

@@ -6,6 +6,7 @@ import (
 
 	"go.hackfix.me/disco/app/cli"
 	actx "go.hackfix.me/disco/app/context"
+	aerrors "go.hackfix.me/disco/app/errors"
 )
 
 // App is the application.
@@ -49,9 +50,22 @@ func (app *App) Run() {
 }
 
 // FatalIfErrorf terminates the application with an error message if err != nil.
-func (app *App) FatalIfErrorf(err error, args ...interface{}) {
+func (app *App) FatalIfErrorf(err error, args ...any) {
 	if err != nil {
-		app.ctx.Logger.Error(err.Error(), args...)
+		msg := err.Error()
+		if errh, ok := err.(aerrors.WithHint); ok {
+			hint := errh.Hint()
+			if hint != "" {
+				args = append([]any{"hint", hint}, args...)
+			}
+		}
+		if errc, ok := err.(aerrors.WithCause); ok {
+			cause := errc.Cause()
+			if cause != nil {
+				args = append([]any{"cause", cause}, args...)
+			}
+		}
+		app.ctx.Logger.Error(msg, args...)
 		app.Exit(1)
 	}
 }

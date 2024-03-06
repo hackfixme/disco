@@ -119,7 +119,9 @@ func (s *Store) Set(namespace, key string, value []byte) error {
 	}
 	_, err = s.ExecContext(s.NewContext(), fmt.Sprintf(
 		`INSERT INTO "%s" (key, value)
-		VALUES (?, ?)`, namespace), key, encValue)
+		VALUES (:key, :value)
+		ON CONFLICT(key) DO UPDATE SET value = :value`, namespace),
+		sql.Named("key", key), sql.Named("value", encValue))
 	if err != nil {
 		return aerrors.NewRuntimeError("failed setting key", err, "")
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
 	"regexp"
@@ -75,6 +76,9 @@ func (s *Store) Get(namespace, key string) (value []byte, err error) {
 		FROM "%s"
 		WHERE key = ?`, namespace), key).Scan(&value)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 

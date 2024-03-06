@@ -59,15 +59,16 @@ func Open(ctx context.Context, path string, opts ...Option) (*Store, error) {
 }
 
 // Get returns the value associated with a key within a specific namespace.
-func (s *Store) Get(namespace, key string) (value []byte, err error) {
+// The returned boolean indicates whether the value was found or not.
+func (s *Store) Get(namespace, key string) (ok bool, value []byte, err error) {
 	// Validate the table name to ensure it actually exists. This prevents
 	// possible SQL injection attacks, since we parametrize the table name below.
 	allTables, err := queries.GetAllTables(s.NewContext(), s)
 	if err != nil {
-		return nil, err
+		return false, nil, err
 	}
 	if _, ok := allTables[namespace]; !ok {
-		return nil, nil
+		return false, nil, nil
 	}
 
 	// Namespaces are stored in different tables, but parameterization is not
@@ -77,17 +78,17 @@ func (s *Store) Get(namespace, key string) (value []byte, err error) {
 		WHERE key = ?`, namespace), key).Scan(&value)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
+			return false, nil, nil
 		}
-		return nil, err
+		return false, nil, err
 	}
 
 	decValue, err := crypto.Decrypt(value, s.encKey)
 	if err != nil {
-		return nil, aerrors.NewRuntimeError("failed decrypting value", err, "")
+		return true, nil, aerrors.NewRuntimeError("failed decrypting value", err, "")
 	}
 
-	return decValue, nil
+	return true, decValue, nil
 }
 
 func (s *Store) Set(namespace, key string, value []byte) error {

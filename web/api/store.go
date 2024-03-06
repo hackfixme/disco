@@ -28,7 +28,7 @@ func (h *Handler) StoreGet(w http.ResponseWriter, r *http.Request) {
 		req.Namespace = ns
 	}
 
-	val, err := h.appCtx.Store.Get(req.Namespace, req.Key)
+	ok, val, err := h.appCtx.Store.Get(req.Namespace, req.Key)
 	if err != nil {
 		_ = render.Render(w, r, lib.ErrInternal(err))
 		return
@@ -36,6 +36,11 @@ func (h *Handler) StoreGet(w http.ResponseWriter, r *http.Request) {
 
 	// TODO: Infer Content-Type from the value
 	w.Header().Del("Content-Type")
+
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
 
 	_, err = w.Write(val)
 	if err != nil {

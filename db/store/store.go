@@ -4,7 +4,7 @@ package store
 // data.
 type Store interface {
 	Close() error
-	Get(namespace, key string) (value []byte, err error)
+	Get(namespace, key string) (ok bool, value []byte, err error)
 	Set(namespace, key string, value []byte) error
 	List(namespace, keyPrefix string) (map[string][]string, error)
 }

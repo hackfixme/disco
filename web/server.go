@@ -8,18 +8,18 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
-	"go.hackfix.me/disco/app/ctx"
+	actx "go.hackfix.me/disco/app/context"
 	"go.hackfix.me/disco/web/api"
 )
 
 // Server is a wrapper around http.Server with some custom behavior.
 type Server struct {
 	*http.Server
-	appCtx *ctx.Context
+	appCtx *actx.Context
 }
 
 // NewServer returns a new Server instance.
-func NewServer(appCtx *ctx.Context, addr string) *Server {
+func NewServer(appCtx *actx.Context, addr string) *Server {
 	return &Server{
 		appCtx: appCtx,
 		Server: &http.Server{
@@ -47,7 +47,7 @@ func (s *Server) ListenAndServe() error {
 	return s.Serve(ln)
 }
 
-func setupRouter(appCtx *ctx.Context) chi.Router {
+func setupRouter(appCtx *actx.Context) chi.Router {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RealIP)

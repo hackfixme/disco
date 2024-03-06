@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"go.hackfix.me/disco/app/ctx"
+	actx "go.hackfix.me/disco/app/context"
 )
 
 // The Get command retrieves and prints the value of a key.
@@ -15,7 +15,7 @@ type Get struct {
 }
 
 // Run the get command.
-func (c *Get) Run(appCtx *ctx.Context) error {
+func (c *Get) Run(appCtx *actx.Context) error {
 	if c.Namespace == "*" {
 		// TODO: Think about how the wildcard namespace could work for the get
 		// command. Output values for the given key in all namespaces, separated
@@ -23,12 +23,14 @@ func (c *Get) Run(appCtx *ctx.Context) error {
 		return errors.New("namespace '*' is not supported for the get command")
 	}
 
-	val, err := appCtx.Store.Get(c.Namespace, []byte(c.Key))
+	val, err := appCtx.Store.Get(c.Namespace, c.Key)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(appCtx.Stdout, "%s\n", val)
+	if len(val) > 0 {
+		fmt.Fprintf(appCtx.Stdout, "%s\n", val)
+	}
 
 	return nil
 }

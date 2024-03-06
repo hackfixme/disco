@@ -32,7 +32,7 @@ func (h *Handler) StoreGet(w http.ResponseWriter, r *http.Request) {
 		req.Namespace = ns
 	}
 
-	val, err := h.appCtx.Store.Get(req.Namespace, []byte(req.Key))
+	val, err := h.appCtx.Store.Get(req.Namespace, req.Key)
 	if err != nil {
 		_ = render.Render(w, r, lib.ErrInternal(err))
 		return
@@ -74,7 +74,7 @@ func (h *Handler) StoreSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.appCtx.Store.Set(req.Namespace, []byte(req.Key), []byte(req.Value))
+	err := h.appCtx.Store.Set(req.Namespace, req.Key, []byte(req.Value))
 	if err != nil {
 		_ = render.Render(w, r, lib.ErrInternal(err))
 		return
@@ -102,7 +102,11 @@ func (h *Handler) StoreKeys(w http.ResponseWriter, r *http.Request) {
 		req.Namespace = ns
 	}
 
-	nsKeys := h.appCtx.Store.List(req.Namespace, []byte(req.Prefix))
+	nsKeys, err := h.appCtx.Store.List(req.Namespace, req.Prefix)
+	if err != nil {
+		_ = render.Render(w, r, lib.ErrInternal(err))
+		return
+	}
 
 	resp := &StoreKeysResponse{
 		Response: &lib.Response{StatusCode: http.StatusOK},

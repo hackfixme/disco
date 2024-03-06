@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"io"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -13,11 +14,6 @@ import (
 type StoreGetRequest struct {
 	Key       string
 	Namespace string
-}
-
-type StoreGetResponse struct {
-	*lib.Response
-	Data string `json:"data"`
 }
 
 // StoreGet returns the value associated to the received key.
@@ -38,15 +34,18 @@ func (h *Handler) StoreGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = render.Render(w, r, &StoreGetResponse{
-		Response: &lib.Response{StatusCode: http.StatusOK},
-		Data:     string(val),
-	})
+	// TODO: Infer Content-Type from the value
+	w.Header().Del("Content-Type")
+
+	_, err = w.Write(val)
+	if err != nil {
+		_ = render.Render(w, r, lib.ErrInternal(err))
+	}
 }
 
 type StoreSetRequest struct {
 	Key       string
-	Value     string
+	Value     []byte
 	Namespace string
 }
 
@@ -54,27 +53,22 @@ type StoreSetResponse struct {
 	*lib.Response
 }
 
-func (ssr *StoreSetRequest) Bind(r *http.Request) error {
-	if ssr.Namespace == "" {
-		ssr.Namespace = "default"
-	}
-	return nil
-}
-
 // StoreSet stores the provided value associated to the provided key.
 func (h *Handler) StoreSet(w http.ResponseWriter, r *http.Request) {
-	req := &StoreSetRequest{Key: chi.URLParam(r, "*")}
+	req := &StoreSetRequest{Key: chi.URLParam(r, "*"), Namespace: "default"}
 	if req.Key == "" {
 		_ = render.Render(w, r, lib.ErrBadRequest(errors.New("key not provided")))
 		return
 	}
 
-	if err := render.Bind(r, req); err != nil {
-		_ = render.Render(w, r, lib.ErrBadRequest(err))
-		return
+	if ns := r.URL.Query().Get("namespace"); ns != "" {
+		req.Namespace = ns
 	}
 
-	err := h.appCtx.Store.Set(req.Namespace, req.Key, []byte(req.Value))
+	var err error
+	req.Value, err = io.ReadAll(r.Body)
+
+	err = h.appCtx.Store.Set(req.Namespace, req.Key, req.Value)
 	if err != nil {
 		_ = render.Render(w, r, lib.ErrInternal(err))
 		return

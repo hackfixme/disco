@@ -1,11 +1,13 @@
 package sqlite
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"embed"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"regexp"
 
@@ -22,7 +24,8 @@ var migrationsFS embed.FS
 type Store struct {
 	*sql.DB
 	ctx              context.Context
-	encKey           *[32]byte
+	encPubKey        *[32]byte
+	encPrivKey       *[32]byte
 	migrations       []*migrator.Migration
 	validTableNameRx *regexp.Regexp
 }
@@ -60,7 +63,7 @@ func Open(ctx context.Context, path string, opts ...Option) (*Store, error) {
 
 // Get returns the value associated with a key within a specific namespace.
 // The returned boolean indicates whether the value was found or not.
-func (s *Store) Get(namespace, key string) (ok bool, value []byte, err error) {
+func (s *Store) Get(namespace, key string) (ok bool, value io.Reader, err error) {
 	// Validate the table name to ensure it actually exists. This prevents
 	// possible SQL injection attacks, since we parametrize the table name below.
 	allTables, err := queries.GetAllTables(s.NewContext(), s)
@@ -73,9 +76,10 @@ func (s *Store) Get(namespace, key string) (ok bool, value []byte, err error) {
 
 	// Namespaces are stored in different tables, but parameterization is not
 	// supported for table names, so template it manually.
+	var encValue []byte
 	err = s.QueryRowContext(s.ctx, fmt.Sprintf(`SELECT value
 		FROM "%s"
-		WHERE key = ?`, namespace), key).Scan(&value)
+		WHERE key = ?`, namespace), key).Scan(&encValue)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil, nil
@@ -83,7 +87,7 @@ func (s *Store) Get(namespace, key string) (ok bool, value []byte, err error) {
 		return false, nil, err
 	}
 
-	decValue, err := crypto.Decrypt(value, s.encKey)
+	decValue, err := crypto.DecryptNaCl(bytes.NewReader(encValue), s.encPubKey, s.encPrivKey)
 	if err != nil {
 		return true, nil, aerrors.NewRuntimeError("failed decrypting value", err, "")
 	}
@@ -91,7 +95,7 @@ func (s *Store) Get(namespace, key string) (ok bool, value []byte, err error) {
 	return true, decValue, nil
 }
 
-func (s *Store) Set(namespace, key string, value []byte) error {
+func (s *Store) Set(namespace, key string, value io.Reader) error {
 	// Validate the table name to ensure it actually exists. This prevents
 	// possible SQL injection attacks, since we parametrize the table name below.
 	allTables, err := queries.GetAllTables(s.NewContext(), s)
@@ -114,9 +118,14 @@ func (s *Store) Set(namespace, key string, value []byte) error {
 		}
 	}
 
-	encValue, err := crypto.Encrypt(value, s.encKey)
+	encData, err := crypto.EncryptNaCl(value, s.encPubKey, s.encPrivKey)
 	if err != nil {
 		return aerrors.NewRuntimeError("failed encrypting value", err, "")
+	}
+
+	encValue, err := io.ReadAll(encData)
+	if err != nil {
+		return aerrors.NewRuntimeError("failed reading encrypted data", err, "")
 	}
 	_, err = s.ExecContext(s.NewContext(), fmt.Sprintf(
 		`INSERT INTO "%s" (key, value)

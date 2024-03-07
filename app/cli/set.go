@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"bytes"
 	"errors"
+	"io"
 
 	actx "go.hackfix.me/disco/app/context"
 )
@@ -22,5 +24,11 @@ func (c *Set) Run(appCtx *actx.Context) error {
 		// existing namespaces.
 		return errors.New("namespace '*' is not supported for the set command")
 	}
-	return appCtx.Store.Set(c.Namespace, c.Key, []byte(c.Value))
+
+	var val io.Reader = bytes.NewReader([]byte(c.Value))
+	if c.Value == "-" {
+		val = appCtx.Stdin
+	}
+
+	return appCtx.Store.Set(c.Namespace, c.Key, val)
 }

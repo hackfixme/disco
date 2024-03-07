@@ -29,7 +29,7 @@ func (c *Get) Run(appCtx *actx.Context) error {
 	}
 
 	if ok {
-		fmt.Fprintf(appCtx.Stdout, "%s\n", val)
+		fmt.Fprintf(appCtx.Stdout, "%s", val)
 	}
 
 	return nil

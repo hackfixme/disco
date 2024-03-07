@@ -12,26 +12,33 @@ import (
 type Option func(*Store) error
 
 // WithEncryptionKey validates and sets the store encryption key.
-func WithEncryptionKey(key string) Option {
+func WithEncryptionKey(privKeyHex string) Option {
 	return func(s *Store) error {
-		existingKeyHash, err := queries.GetEncryptionKeyHash(s.ctx, s)
-		if err != nil || !existingKeyHash.Valid {
+		privKeyHash, privKeyErr := queries.GetEncryptionPrivKeyHash(s.ctx, s)
+		pubKeyHex, pubKeyErr := queries.GetEncryptionPubKey(s.ctx, s)
+		if privKeyErr != nil || !privKeyHash.Valid ||
+			pubKeyErr != nil || !pubKeyHex.Valid {
 			return aerrors.NewRuntimeError("missing encryption key", nil,
 				"Did you forget to run 'disco init'?")
 		}
 
-		encKey, decodeErr := crypto.DecodeHexKey(key)
-		if decodeErr != nil {
-			return aerrors.NewRuntimeError("invalid encryption key", decodeErr, "")
+		privKey, decKeyErr := crypto.DecodeHexKey(privKeyHex)
+		pubKey, decPubKeyErr := crypto.DecodeHexKey(pubKeyHex.V)
+		if decKeyErr == nil {
+			decKeyErr = decPubKeyErr
+		}
+		if decKeyErr != nil {
+			return aerrors.NewRuntimeError("invalid encryption key", decKeyErr, "")
 		}
 
-		keyHash := crypto.Hash("encryption key hash", encKey[:])
-		keyHashHex := hex.EncodeToString(keyHash)
-		if existingKeyHash.V != keyHashHex {
+		inPrivKeyHash := crypto.Hash("encryption key hash", privKey[:])
+		inPrivKeyHashHex := hex.EncodeToString(inPrivKeyHash)
+		if privKeyHash.V != inPrivKeyHashHex {
 			return aerrors.NewRuntimeError("invalid encryption key", nil, "")
 		}
 
-		s.encKey = encKey
+		s.encPubKey = pubKey
+		s.encPrivKey = privKey
 
 		return nil
 	}

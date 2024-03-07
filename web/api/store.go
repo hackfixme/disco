@@ -42,7 +42,7 @@ func (h *Handler) StoreGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = w.Write(val)
+	_, err = io.Copy(w, val)
 	if err != nil {
 		_ = render.Render(w, r, lib.ErrInternal(err))
 	}
@@ -70,10 +70,7 @@ func (h *Handler) StoreSet(w http.ResponseWriter, r *http.Request) {
 		req.Namespace = ns
 	}
 
-	var err error
-	req.Value, err = io.ReadAll(r.Body)
-
-	err = h.appCtx.Store.Set(req.Namespace, req.Key, req.Value)
+	err := h.appCtx.Store.Set(req.Namespace, req.Key, r.Body)
 	if err != nil {
 		_ = render.Render(w, r, lib.ErrInternal(err))
 		return

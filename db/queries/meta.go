@@ -9,15 +9,26 @@ import (
 	"go.hackfix.me/disco/db/types"
 )
 
-func GetEncryptionKeyHash(ctx context.Context, d types.Querier) (sql.Null[string], error) {
+func GetEncryptionPrivKeyHash(ctx context.Context, d types.Querier) (sql.Null[string], error) {
 	var keyHash sql.Null[string]
-	err := d.QueryRowContext(ctx, `SELECT key_hash FROM _meta`).
+	err := d.QueryRowContext(ctx, `SELECT private_key_hash FROM _meta`).
 		Scan(&keyHash)
 	if err != nil {
 		return keyHash, err
 	}
 
 	return keyHash, nil
+}
+
+func GetEncryptionPubKey(ctx context.Context, d types.Querier) (sql.Null[string], error) {
+	var pubKey sql.Null[string]
+	err := d.QueryRowContext(ctx, `SELECT public_key FROM _meta`).
+		Scan(&pubKey)
+	if err != nil {
+		return pubKey, err
+	}
+
+	return pubKey, nil
 }
 
 func GetAllTables(ctx context.Context, d types.Querier) (map[string]struct{}, error) {

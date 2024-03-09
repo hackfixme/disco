@@ -18,11 +18,11 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 
+	"github.com/mr-tron/base58"
 	"golang.org/x/crypto/nacl/box"
 )
 
@@ -37,9 +37,9 @@ func NewEncryptionKey() *[32]byte {
 	return &key
 }
 
-// DecodeHexKey validates and decodes an encryption key.
-func DecodeHexKey(hexKey string) (*[32]byte, error) {
-	keyDec, err := hex.DecodeString(hexKey)
+// DecodeKey decodes and validates an encryption key.
+func DecodeKey(keyEnc string) (*[32]byte, error) {
+	keyDec, err := base58.Decode(keyEnc)
 	if err != nil {
 		return nil, err
 	}

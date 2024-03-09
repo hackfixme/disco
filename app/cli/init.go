@@ -2,9 +2,9 @@ package cli
 
 import (
 	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 
+	"github.com/mr-tron/base58"
 	"golang.org/x/crypto/nacl/box"
 
 	actx "go.hackfix.me/disco/app/context"
@@ -43,7 +43,7 @@ func (c *Init) Run(appCtx *actx.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed generating encryption keypair: %w", err)
 	}
-	privKeyHex := hex.EncodeToString(privKey[:])
+	privKeyEnc := base58.Encode(privKey[:])
 
 	if sqlStore, ok := appCtx.Store.(*sqlite.Store); ok {
 		storeMigrations := sqlStore.Migrations()
@@ -52,13 +52,13 @@ func (c *Init) Run(appCtx *actx.Context) error {
 			return err
 		}
 
-		pubKeyHex := hex.EncodeToString(pubKey[:])
+		pubKeyEnc := base58.Encode(pubKey[:])
 		privKeyHash := crypto.Hash("encryption key hash", privKey[:])
-		privKeyHashHex := hex.EncodeToString(privKeyHash)
+		privKeyHashEnc := base58.Encode(privKeyHash)
 		_, err = sqlStore.ExecContext(appCtx.Ctx,
 			`INSERT INTO _meta (version, public_key, private_key_hash)
 			VALUES (?, ?, ?)`,
-			appCtx.Version, pubKeyHex, privKeyHashHex)
+			appCtx.Version, pubKeyEnc, privKeyHashEnc)
 		if err != nil {
 			return err
 		}
@@ -69,7 +69,7 @@ func (c *Init) Run(appCtx *actx.Context) error {
 Make sure to store this key in a secure location, such as a password manager.
 
 You won't be able to access the data on this node without it!
-	`, privKeyHex)
+	`, privKeyEnc)
 
 	return nil
 }

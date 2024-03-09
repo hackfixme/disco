@@ -17,7 +17,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -101,9 +100,11 @@ func Decrypt(ciphertext []byte, key *[32]byte) (plaintext []byte, err error) {
 	)
 }
 
+const nonceSize = 24
+
 // GenerateNonce creates a new random nonce.
-func GenerateNonce() (*[24]byte, error) {
-	nonce := new([24]byte)
+func GenerateNonce() (*[nonceSize]byte, error) {
+	nonce := new([nonceSize]byte)
 	_, err := io.ReadFull(rand.Reader, nonce[:])
 	if err != nil {
 		return nil, err
@@ -137,13 +138,6 @@ func EncryptNaCl(in io.Reader, publicKey, privateKey *[32]byte) (io.Reader, erro
 		}
 
 		encrypted := box.Seal(nonce[:], buf[:n], nonce, publicKey, privateKey)
-		payloadSize := len(encrypted)
-
-		// Write payload size to buffer
-		err = binary.Write(out, binary.LittleEndian, uint32(payloadSize))
-		if err != nil {
-			return nil, fmt.Errorf("failed writing payload size to buffer: %w", err)
-		}
 
 		_, err = out.Write(encrypted)
 		if err != nil {
@@ -155,35 +149,31 @@ func EncryptNaCl(in io.Reader, publicKey, privateKey *[32]byte) (io.Reader, erro
 }
 
 func DecryptNaCl(in io.Reader, publicKey, privateKey *[32]byte) (io.Reader, error) {
-	out := &bytes.Buffer{}
+	var (
+		buf = make([]byte, nonceSize+chunkSize+box.Overhead)
+		out = &bytes.Buffer{}
+	)
 
 	for {
-		// Read the payload size out of the buffer
-		var payloadSize uint32
-		err := binary.Read(in, binary.LittleEndian, &payloadSize)
+		// Read the payload
+		n, err := in.Read(buf)
 		if err != nil && err != io.EOF {
-			return nil, fmt.Errorf("failed reading payload size from buffer: %w", err)
+			return nil, fmt.Errorf("failed reading payload from buffer: %w", err)
 		}
-		if payloadSize == 0 {
+		if n == 0 {
 			break
 		}
 
-		// Read the payload
-		data := make([]byte, payloadSize)
-		_, err = io.ReadFull(in, data)
-		if err != nil {
-			return nil, fmt.Errorf("failed reading payload from buffer: %w", err)
-		}
+		// Unpack the payload
+		var nonce [nonceSize]byte
+		copy(nonce[:], buf[:nonceSize])
+		encrypted := buf[nonceSize:n]
 
-		nonce := data[:24]
-		encrypted := data[24:]
-
-		var nonceBuf [24]byte
-		copy(nonceBuf[:], nonce)
-		decrypted, ok := box.Open(nil, encrypted, &nonceBuf, publicKey, privateKey)
+		decrypted, ok := box.Open(nil, encrypted, &nonce, publicKey, privateKey)
 		if !ok {
 			return nil, errors.New("failed decrypting chunk")
 		}
+
 		_, err = out.Write(decrypted)
 		if err != nil {
 			return nil, fmt.Errorf("failed writing decrypted data: %w", err)

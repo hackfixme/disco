@@ -1,21 +1,7 @@
-// cryptopasta - basic cryptography examples
-//
-// Written in 2015 by George Tankersley <george.tankersley@gmail.com>
-//
-// To the extent possible under law, the author(s) have dedicated all copyright
-// and related and neighboring rights to this software to the public domain
-// worldwide. This software is distributed without any warranty.
-//
-// You should have received a copy of the CC0 Public Domain Dedication along
-// with this software. If not, see // <http://creativecommons.org/publicdomain/zero/1.0/>.
-
-// Provides symmetric authenticated encryption using 256-bit AES-GCM with a random nonce.
 package crypto
 
 import (
 	"bytes"
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/rand"
 	"errors"
 	"fmt"
@@ -23,101 +9,40 @@ import (
 
 	"github.com/mr-tron/base58"
 	"golang.org/x/crypto/nacl/box"
+	"golang.org/x/crypto/nacl/secretbox"
 )
 
-// NewEncryptionKey generates a random 256-bit key for Encrypt() and
-// Decrypt(). It panics if the source of randomness fails.
-func NewEncryptionKey() *[32]byte {
-	key := [32]byte{}
-	_, err := io.ReadFull(rand.Reader, key[:])
-	if err != nil {
-		panic(err)
-	}
-	return &key
+const (
+	// Maximum size of each encrypted chunk of data. NaCl is recommended for
+	// encrypting "small" messages, so large data is split into 16KB chunks.
+	chunkSize = 16 * 1024 // 16KB
+	nonceSize = 24
+)
+
+// EncryptSym performs symmetric encryption of the plaintext data using NaCl
+// primitives (Curve25519, XSalsa20 and Poly1305).
+func EncryptSym(plaintext io.Reader, secretKey *[32]byte) (io.Reader, error) {
+	return encrypt(plaintext, nil, secretKey)
 }
 
-// DecodeKey decodes and validates an encryption key.
-func DecodeKey(keyEnc string) (*[32]byte, error) {
-	keyDec, err := base58.Decode(keyEnc)
-	if err != nil {
-		return nil, err
-	}
-	if len(keyDec) != 32 {
-		return nil, fmt.Errorf("expected key length of 32; got %d", len(keyDec))
-	}
-
-	var key [32]byte
-	copy(key[:], keyDec)
-
-	return &key, nil
+// EncryptAsym performs asymmetric encryption of the plaintext data using NaCl
+// primitives (Curve25519, XSalsa20 and Poly1305).
+func EncryptAsym(plaintext io.Reader, publicKey, privateKey *[32]byte) (io.Reader, error) {
+	return encrypt(plaintext, publicKey, privateKey)
 }
 
-// Encrypt encrypts data using 256-bit AES-GCM.  This both hides the content of
-// the data and provides a check that it hasn't been altered. Output takes the
-// form nonce|ciphertext|tag where '|' indicates concatenation.
-func Encrypt(plaintext []byte, key *[32]byte) (ciphertext []byte, err error) {
-	block, err := aes.NewCipher(key[:])
-	if err != nil {
-		return nil, err
+func encrypt(in io.Reader, publicKey, privateKey *[32]byte) (io.Reader, error) {
+	var encrypt func(out, message []byte, nonce *[nonceSize]byte) []byte
+	if publicKey == nil {
+		encrypt = func(out, message []byte, nonce *[nonceSize]byte) []byte {
+			return secretbox.Seal(out, message, nonce, privateKey)
+		}
+	} else {
+		encrypt = func(out, message []byte, nonce *[nonceSize]byte) []byte {
+			return box.Seal(out, message, nonce, publicKey, privateKey)
+		}
 	}
 
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, err
-	}
-
-	nonce := make([]byte, gcm.NonceSize())
-	_, err = io.ReadFull(rand.Reader, nonce)
-	if err != nil {
-		return nil, err
-	}
-
-	return gcm.Seal(nonce, nonce, plaintext, nil), nil
-}
-
-// Decrypt decrypts data using 256-bit AES-GCM.  This both hides the content of
-// the data and provides a check that it hasn't been altered. Expects input
-// form nonce|ciphertext|tag where '|' indicates concatenation.
-func Decrypt(ciphertext []byte, key *[32]byte) (plaintext []byte, err error) {
-	block, err := aes.NewCipher(key[:])
-	if err != nil {
-		return nil, err
-	}
-
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(ciphertext) < gcm.NonceSize() {
-		return nil, errors.New("malformed ciphertext")
-	}
-
-	return gcm.Open(nil,
-		ciphertext[:gcm.NonceSize()],
-		ciphertext[gcm.NonceSize():],
-		nil,
-	)
-}
-
-const nonceSize = 24
-
-// GenerateNonce creates a new random nonce.
-func GenerateNonce() (*[nonceSize]byte, error) {
-	nonce := new([nonceSize]byte)
-	_, err := io.ReadFull(rand.Reader, nonce[:])
-	if err != nil {
-		return nil, err
-	}
-
-	return nonce, nil
-}
-
-// Maximum size of each encrypted chunk of data. NaCl is recommended for
-// encrypting "small" messages, so large data is split into 16KB chunks.
-const chunkSize = 16 * 1024 // 16KB
-
-func EncryptNaCl(in io.Reader, publicKey, privateKey *[32]byte) (io.Reader, error) {
 	var (
 		buf = make([]byte, chunkSize)
 		out = &bytes.Buffer{}
@@ -132,12 +57,12 @@ func EncryptNaCl(in io.Reader, publicKey, privateKey *[32]byte) (io.Reader, erro
 			break
 		}
 
-		nonce, err := GenerateNonce()
+		nonce, err := generateNonce()
 		if err != nil {
 			return nil, fmt.Errorf("failed generating nonce: %w", err)
 		}
 
-		encrypted := box.Seal(nonce[:], buf[:n], nonce, publicKey, privateKey)
+		encrypted := encrypt(nonce[:], buf[:n], nonce)
 
 		_, err = out.Write(encrypted)
 		if err != nil {
@@ -148,7 +73,30 @@ func EncryptNaCl(in io.Reader, publicKey, privateKey *[32]byte) (io.Reader, erro
 	return out, nil
 }
 
-func DecryptNaCl(in io.Reader, publicKey, privateKey *[32]byte) (io.Reader, error) {
+// DecryptSym performs symmetric decryption of the in ciphertext data using NaCl
+// primitives (Curve25519, XSalsa20 and Poly1305).
+func DecryptSym(ciphertext io.Reader, secretKey *[32]byte) (io.Reader, error) {
+	return decrypt(ciphertext, nil, secretKey)
+}
+
+// DecryptAsym performs asymmetric decryption of the ciphertext data using NaCl
+// primitives (Curve25519, XSalsa20 and Poly1305).
+func DecryptAsym(ciphertext io.Reader, publicKey, privateKey *[32]byte) (io.Reader, error) {
+	return decrypt(ciphertext, publicKey, privateKey)
+}
+
+func decrypt(in io.Reader, publicKey, privateKey *[32]byte) (io.Reader, error) {
+	var decrypt func(out, data []byte, nonce *[nonceSize]byte) ([]byte, bool)
+	if publicKey == nil {
+		decrypt = func(out, data []byte, nonce *[nonceSize]byte) ([]byte, bool) {
+			return secretbox.Open(out, data, nonce, privateKey)
+		}
+	} else {
+		decrypt = func(out, data []byte, nonce *[nonceSize]byte) ([]byte, bool) {
+			return box.Open(out, data, nonce, publicKey, privateKey)
+		}
+	}
+
 	var (
 		buf = make([]byte, nonceSize+chunkSize+box.Overhead)
 		out = &bytes.Buffer{}
@@ -169,7 +117,7 @@ func DecryptNaCl(in io.Reader, publicKey, privateKey *[32]byte) (io.Reader, erro
 		copy(nonce[:], buf[:nonceSize])
 		encrypted := buf[nonceSize:n]
 
-		decrypted, ok := box.Open(nil, encrypted, &nonce, publicKey, privateKey)
+		decrypted, ok := decrypt(nil, encrypted, &nonce)
 		if !ok {
 			return nil, errors.New("failed decrypting chunk")
 		}
@@ -181,4 +129,30 @@ func DecryptNaCl(in io.Reader, publicKey, privateKey *[32]byte) (io.Reader, erro
 	}
 
 	return out, nil
+}
+
+// DecodeKey decodes and validates an encryption key.
+func DecodeKey(keyEnc string) (*[32]byte, error) {
+	keyDec, err := base58.Decode(keyEnc)
+	if err != nil {
+		return nil, err
+	}
+	if len(keyDec) != 32 {
+		return nil, fmt.Errorf("expected key length of 32; got %d", len(keyDec))
+	}
+
+	var key [32]byte
+	copy(key[:], keyDec)
+
+	return &key, nil
+}
+
+func generateNonce() (*[nonceSize]byte, error) {
+	nonce := new([nonceSize]byte)
+	_, err := io.ReadFull(rand.Reader, nonce[:])
+	if err != nil {
+		return nil, err
+	}
+
+	return nonce, nil
 }

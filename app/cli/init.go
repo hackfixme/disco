@@ -41,7 +41,7 @@ func (c *Init) Run(appCtx *actx.Context) error {
 
 	pubKey, privKey, err := box.GenerateKey(rand.Reader)
 	if err != nil {
-		return fmt.Errorf("failed generating encryption keypair: %w", err)
+		return fmt.Errorf("failed generating encryption key pair: %w", err)
 	}
 	privKeyEnc := base58.Encode(privKey[:])
 
@@ -57,8 +57,7 @@ func (c *Init) Run(appCtx *actx.Context) error {
 		privKeyHashEnc := base58.Encode(privKeyHash)
 		_, err = sqlStore.ExecContext(appCtx.Ctx,
 			`INSERT INTO _meta (version, public_key, private_key_hash)
-			VALUES (?, ?, ?)`,
-			appCtx.Version, pubKeyEnc, privKeyHashEnc)
+			VALUES (?, ?, ?)`, appCtx.Version, pubKeyEnc, privKeyHashEnc)
 		if err != nil {
 			return err
 		}

@@ -16,7 +16,7 @@ type CLI struct {
 	LS    LS    `kong:"cmd,help='List keys.'"`
 	Serve Serve `kong:"cmd,help='Start the web server.'"`
 
-	EncryptionKey string `kong:"help='AES private key used for encrypting the local data store.\n It must be either 16, 24, or 32 bytes, for AES-128, AES-192 or AES-256 respectively. '"`
+	EncryptionKey string `kong:"help='32-byte private key used for encrypting and decrypting the local data store, encoded in base 58. '"`
 }
 
 // Setup the command-line interface.

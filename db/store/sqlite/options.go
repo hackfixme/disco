@@ -15,20 +15,14 @@ type Option func(*Store) error
 func WithEncryptionKey(privKeyEnc string) Option {
 	return func(s *Store) error {
 		privKeyHash, privKeyErr := queries.GetEncryptionPrivKeyHash(s.ctx, s)
-		pubKeyEnc, pubKeyErr := queries.GetEncryptionPubKey(s.ctx, s)
-		if privKeyErr != nil || !privKeyHash.Valid ||
-			pubKeyErr != nil || !pubKeyEnc.Valid {
+		if privKeyErr != nil || !privKeyHash.Valid {
 			return aerrors.NewRuntimeError("missing encryption key", nil,
 				"Did you forget to run 'disco init'?")
 		}
 
-		privKey, decKeyErr := crypto.DecodeKey(privKeyEnc)
-		pubKey, decPubKeyErr := crypto.DecodeKey(pubKeyEnc.V)
-		if decKeyErr == nil {
-			decKeyErr = decPubKeyErr
-		}
-		if decKeyErr != nil {
-			return aerrors.NewRuntimeError("invalid encryption key", decKeyErr, "")
+		privKey, err := crypto.DecodeKey(privKeyEnc)
+		if err != nil {
+			return aerrors.NewRuntimeError("invalid encryption key", err, "")
 		}
 
 		inPrivKeyHash := crypto.Hash("encryption key hash", privKey[:])
@@ -37,8 +31,7 @@ func WithEncryptionKey(privKeyEnc string) Option {
 			return aerrors.NewRuntimeError("invalid encryption key", nil, "")
 		}
 
-		s.encPubKey = pubKey
-		s.encPrivKey = privKey
+		s.privKey = privKey
 
 		return nil
 	}

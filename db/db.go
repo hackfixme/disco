@@ -49,8 +49,3 @@ func (d *DB) NewContext() context.Context {
 	ctx, _ := context.WithCancel(d.ctx)
 	return ctx
 }
-
-// Migrations returns all database migrations.
-func (d *DB) Migrations() []*migrator.Migration {
-	return d.migrations
-}

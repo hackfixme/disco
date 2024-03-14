@@ -1,17 +1,13 @@
 package cli
 
 import (
-	"crypto/rand"
 	"fmt"
 
 	"github.com/mr-tron/base58"
-	"golang.org/x/crypto/nacl/box"
 
 	actx "go.hackfix.me/disco/app/context"
-	"go.hackfix.me/disco/crypto"
-	"go.hackfix.me/disco/db/migrator"
+	aerrors "go.hackfix.me/disco/app/errors"
 	"go.hackfix.me/disco/db/queries"
-	"go.hackfix.me/disco/db/store/sqlite"
 )
 
 // The Init command initializes the Disco data stores and generates a new
@@ -20,55 +16,27 @@ type Init struct{}
 
 // Run the init command.
 func (c *Init) Run(appCtx *actx.Context) error {
-	dbMigrations := appCtx.DB.Migrations()
-	err := migrator.RunMigrations(appCtx.DB, dbMigrations, migrator.MigrationUp, "all")
-	if err != nil {
-		return err
-	}
-
 	version, err := queries.Version(appCtx.Ctx, appCtx.DB)
 	if version.Valid {
 		// TODO: Add --force option?
 		return fmt.Errorf("Disco is already initialized with version %s", version.V)
 	}
 
-	_, err = appCtx.DB.ExecContext(appCtx.Ctx,
-		`INSERT INTO _meta (version) VALUES (?)`,
-		appCtx.Version)
+	appCtx.User, err = appCtx.DB.Init(appCtx.Version)
 	if err != nil {
-		return err
+		return aerrors.NewRuntimeError("failed initializing database", err, "")
 	}
 
-	pubKey, privKey, err := box.GenerateKey(rand.Reader)
-	if err != nil {
-		return fmt.Errorf("failed generating encryption key pair: %w", err)
-	}
-	privKeyEnc := base58.Encode(privKey[:])
-
-	if sqlStore, ok := appCtx.Store.(*sqlite.Store); ok {
-		storeMigrations := sqlStore.Migrations()
-		err = migrator.RunMigrations(sqlStore, storeMigrations, migrator.MigrationUp, "all")
-		if err != nil {
-			return err
-		}
-
-		pubKeyEnc := base58.Encode(pubKey[:])
-		privKeyHash := crypto.Hash("encryption key hash", privKey[:])
-		privKeyHashEnc := base58.Encode(privKeyHash)
-		_, err = sqlStore.ExecContext(appCtx.Ctx,
-			`INSERT INTO _meta (version, public_key, private_key_hash)
-			VALUES (?, ?, ?)`, appCtx.Version, pubKeyEnc, privKeyHashEnc)
-		if err != nil {
-			return err
-		}
+	if err = appCtx.Store.Init(appCtx.Version); err != nil {
+		return aerrors.NewRuntimeError("failed initializing store", err, "")
 	}
 
 	fmt.Fprintf(appCtx.Stdout, `New encryption key: %s
 
 Make sure to store this key in a secure location, such as a password manager.
 
-You won't be able to access the data on this node without it!
-	`, privKeyEnc)
+It will only be shown once, and you won't be able to access the data on this node without it!
+	`, base58.Encode(appCtx.User.PrivateKey[:]))
 
 	return nil
 }

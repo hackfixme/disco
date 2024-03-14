@@ -184,14 +184,26 @@ func (s *Store) List(namespace, keyPrefix string) (map[string][]string, error) {
 	return keysPerNS, nil
 }
 
-// Migrations returns all database migrations.
-func (s *Store) Migrations() []*migrator.Migration {
-	return s.migrations
-}
-
 // NewContext returns a new child context of the main database context.
 func (s *Store) NewContext() context.Context {
 	// TODO: Return cancel func?
 	ctx, _ := context.WithCancel(s.ctx)
 	return ctx
+}
+
+// Init creates the database schema and initial records.
+func (s *Store) Init(appVersion string) error {
+	err := migrator.RunMigrations(s, s.migrations, migrator.MigrationUp, "all")
+	if err != nil {
+		return err
+	}
+
+	dbCtx := s.NewContext()
+	_, err = s.ExecContext(dbCtx,
+		`INSERT INTO _meta (version) VALUES (?)`, appVersion)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

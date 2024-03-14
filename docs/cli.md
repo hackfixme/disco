@@ -23,7 +23,7 @@ myapp/mykey
 Namespaces are created automatically when used. They are supported by the `get`,
 `set` and `ls` commands.
 
-Unless specified, the `default` namespace is used. To change this, set the value of the `DISCO_NAMESPACE` environment variable.
+Unless specified, the `default` namespace is used. To change this, set the value of the `DISCO_NAMESPACE` environment variable, or set the `--namespace` option.
 
 - Set a value in a specific namespace:
   ```sh
@@ -37,38 +37,42 @@ Unless specified, the `default` namespace is used. To change this, set the value
   myns:myapp/mykey
   ```
 
-  The namespace of the key is prefixed.
+  The namespace of the key is shown as a prefix.
 
 
 ### Roles
 - List all roles:
   ```sh
   $ disco role ls
-  NAME     PERMISSIONS
-  admin    *:*:rw
-  user     keys:*:ro,values:*:ro
+  NAME    NAMESPACES   ACTIONS   TARGET
+  admin   *            *         *
+  node    *            read      store:*
+  user    *            *         store:*
   ```
 
-- Create a new role that can only read keys and values in the myapp hierarchy:
+- Create a new role that can only read store keys and values in the `myapp` hierarchy in all namespaces:
   ```sh
-  $ disco role new myrole 'keys:myapp/*:ro,values:myapp/*:ro'
+  $ disco role add myrole 'r:*:store:myapp/*'
+  ```
+
+- Update the role so that it can read, write and delete all store keys and values in the `dev` and `staging` namespaces, and write store keys and values in the `myapp` hierarchy in the `prod` namespace:
+  ```sh
+  $ disco role update myrole 'rwd:dev,staging:store:*' 'w:prod:store:myapp/*'
   ```
 
 
 ### Users
 
-- Add a new user with the `myrole` role, in the development and staging namespaces:
+- Add a new user with the `myrole` role:
   ```sh
-  $ disco user add myuser --namespaces development,myns --roles myrole
+  $ disco user add myuser --roles myrole
   ```
 
 - List all users:
   ```sh
   $ disco user ls
-  NAME     NAMESPACES          ROLES
-  admin    *                   admin
-  user     *                   user
-  myuser   development,myns    myrole
+  NAME     ROLES
+  myuser   myrole
   ```
 
 - Create an invite key for a specific user:
@@ -108,8 +112,6 @@ Unless specified, the `default` namespace is used. To change this, set the value
 ### `set`
 
 ### `ls`
-
-### `mount`
 
 ### `remote`
 

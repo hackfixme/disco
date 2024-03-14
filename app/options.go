@@ -35,6 +35,10 @@ func WithDB(dataDir string) Option {
 		var err error
 		app.ctx.DB, err = db.Open(dbCtx, dbPath)
 		app.FatalIfErrorf(err)
+
+		// Enable foreign key enforcement
+		_, err = app.ctx.DB.Exec(`PRAGMA foreign_keys = ON;`)
+		app.FatalIfErrorf(err)
 	}
 }
 

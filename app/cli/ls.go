@@ -7,14 +7,14 @@ import (
 	actx "go.hackfix.me/disco/app/context"
 )
 
-// The LS command prints keys.
-type LS struct {
+// The Ls command prints keys.
+type Ls struct {
 	KeyPrefix string `arg:"" optional:"" help:"An optional key prefix."`
 	Namespace string `default:"default" help:"The namespace to retrieve the keys from.\n If '*' is specified, keys in all namespaces are listed. "`
 }
 
 // Run the ls command.
-func (c *LS) Run(appCtx *actx.Context) error {
+func (c *Ls) Run(appCtx *actx.Context) error {
 	keysPerNS, err := appCtx.Store.List(c.Namespace, c.KeyPrefix)
 	if err != nil {
 		return err

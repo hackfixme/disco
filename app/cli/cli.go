@@ -13,8 +13,10 @@ type CLI struct {
 	Init  Init  `kong:"cmd,help='Initialize the data stores and generate the encryption key.'"`
 	Get   Get   `kong:"cmd,help='Get the value of a key.'"`
 	Set   Set   `kong:"cmd,help='Set the value of a key.'"`
-	LS    LS    `kong:"cmd,help='List keys.'"`
+	Ls    Ls    `kong:"cmd,help='List keys.'"`
+	Role  Role  `kong:"cmd,help='Manage roles.'"`
 	Serve Serve `kong:"cmd,help='Start the web server.'"`
+	User  User  `kong:"cmd,help='Manage users.'"`
 
 	EncryptionKey string `kong:"help='32-byte private key used for encrypting and decrypting the local data store, encoded in base 58. '"`
 }
@@ -27,8 +29,9 @@ func (c *CLI) Setup(appCtx *actx.Context, args []string, exitFn func(int)) error
 		kong.DefaultEnvars("DISCO"),
 		kong.Exit(exitFn),
 		kong.ConfigureHelp(kong.HelpOptions{
-			Compact: true,
-			Summary: true,
+			Compact:             true,
+			Summary:             true,
+			NoExpandSubcommands: true,
 		}),
 	)
 	if err != nil {

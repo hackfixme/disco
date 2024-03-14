@@ -7,6 +7,7 @@ import (
 	"go.hackfix.me/disco/app/cli"
 	actx "go.hackfix.me/disco/app/context"
 	aerrors "go.hackfix.me/disco/app/errors"
+	"go.hackfix.me/disco/db/models"
 )
 
 // App is the application.
@@ -29,6 +30,14 @@ func New(opts ...Option) *App {
 
 	for _, opt := range opts {
 		opt(app)
+	}
+
+	if app.ctx.User == nil && app.ctx.VersionInit != "" {
+		app.ctx.User = &models.User{Name: "local"}
+		if err := app.ctx.User.Load(app.ctx.DB.NewContext(), app.ctx.DB); err != nil {
+			app.FatalIfErrorf(aerrors.NewRuntimeError(
+				"failed loading local user", err, ""))
+		}
 	}
 
 	slog.SetDefault(app.ctx.Logger)

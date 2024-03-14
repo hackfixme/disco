@@ -7,7 +7,6 @@ import (
 
 	actx "go.hackfix.me/disco/app/context"
 	aerrors "go.hackfix.me/disco/app/errors"
-	"go.hackfix.me/disco/db/queries"
 )
 
 // The Init command initializes the Disco data stores and generates a new
@@ -16,12 +15,12 @@ type Init struct{}
 
 // Run the init command.
 func (c *Init) Run(appCtx *actx.Context) error {
-	version, err := queries.Version(appCtx.Ctx, appCtx.DB)
-	if version.Valid {
+	if appCtx.VersionInit != "" {
 		// TODO: Add --force option?
-		return fmt.Errorf("Disco is already initialized with version %s", version.V)
+		return fmt.Errorf("Disco is already initialized with version %s", appCtx.VersionInit)
 	}
 
+	var err error
 	appCtx.User, err = appCtx.DB.Init(appCtx.Version)
 	if err != nil {
 		return aerrors.NewRuntimeError("failed initializing database", err, "")

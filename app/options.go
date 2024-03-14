@@ -11,6 +11,8 @@ import (
 
 	actx "go.hackfix.me/disco/app/context"
 	"go.hackfix.me/disco/db"
+	"go.hackfix.me/disco/db/models"
+	"go.hackfix.me/disco/db/queries"
 	"go.hackfix.me/disco/db/store/sqlite"
 )
 
@@ -39,6 +41,11 @@ func WithDB(dataDir string) Option {
 		// Enable foreign key enforcement
 		_, err = app.ctx.DB.Exec(`PRAGMA foreign_keys = ON;`)
 		app.FatalIfErrorf(err)
+
+		version, err := queries.Version(app.ctx.DB.NewContext(), app.ctx.DB)
+		if version.Valid {
+			app.ctx.VersionInit = version.V
+		}
 	}
 }
 
@@ -110,5 +117,12 @@ func WithStore(dataDir string) Option {
 		if err != nil {
 			app.FatalIfErrorf(err)
 		}
+	}
+}
+
+// WithUser sets the local user of the app.
+func WithUser(user *models.User) Option {
+	return func(app *App) {
+		app.ctx.User = user
 	}
 }

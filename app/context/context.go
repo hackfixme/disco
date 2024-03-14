@@ -8,6 +8,7 @@ import (
 	"github.com/mandelsoft/vfs/pkg/vfs"
 
 	"go.hackfix.me/disco/db"
+	"go.hackfix.me/disco/db/models"
 	"go.hackfix.me/disco/db/store"
 )
 
@@ -15,11 +16,12 @@ import (
 // the application to avoid direct dependencies on external systems, and make
 // testing easier.
 type Context struct {
-	Ctx     context.Context
-	Version string
-	FS      vfs.FileSystem
-	Env     Environment
-	Logger  *slog.Logger
+	Ctx         context.Context
+	Version     string // The static app version in the binary
+	VersionInit string // The app version the DB was initialized with
+	FS          vfs.FileSystem
+	Env         Environment
+	Logger      *slog.Logger
 
 	// Standard streams
 	Stdin  io.Reader
@@ -28,6 +30,7 @@ type Context struct {
 
 	DB    *db.DB
 	Store store.Store
+	User  *models.User
 }
 
 // Environment is the interface to the process environment.

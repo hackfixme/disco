@@ -113,6 +113,40 @@ func (r *Role) Load(ctx context.Context, d types.Querier) error {
 	return nil
 }
 
+// Delete removes the role data from the database. Either the user ID or Name
+// must be set for the lookup. It returns an error if the role doesn't exist.
+func (r *Role) Delete(ctx context.Context, d types.Querier) error {
+	if r.ID == 0 && r.Name == "" {
+		return fmt.Errorf("failed deleting role: either role ID or Name must be set")
+	}
+
+	var filter *types.Filter
+	var filterStr string
+	if r.ID != 0 {
+		filter = &types.Filter{Where: "id = ?", Args: []any{r.ID}}
+		filterStr = fmt.Sprintf("ID %d", r.ID)
+	} else if r.Name != "" {
+		filter = &types.Filter{Where: "name = ?", Args: []any{r.Name}}
+		filterStr = fmt.Sprintf("name '%s'", r.Name)
+	}
+
+	// TODO: Handle FKs and cascade
+	stmt := fmt.Sprintf(`DELETE FROM roles WHERE %s`, filter.Where)
+
+	res, err := d.ExecContext(ctx, stmt, filter.Args...)
+	if err != nil {
+		return fmt.Errorf("failed deleting role with %s: %w", filterStr, err)
+	}
+
+	if n, err := res.RowsAffected(); err != nil {
+		return err
+	} else if n == 0 {
+		return types.ErrNoResult{Msg: fmt.Sprintf("role with %s doesn't exist", filterStr)}
+	}
+
+	return nil
+}
+
 // Roles returns one or more roles from the database, indexed by their name. An
 // optional filter can be passed to limit the results.
 func Roles(ctx context.Context, d types.Querier, filter *types.Filter) (map[string]*Role, error) {

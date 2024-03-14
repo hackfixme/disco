@@ -36,8 +36,16 @@ func (c *User) Run(kctx *kong.Context, appCtx *actx.Context) error {
 
 	switch kctx.Args[1] {
 	case "add":
-		// TODO: Hook up roles.
-		user := &models.User{Name: c.Add.Name}
+		var roles []*models.Role
+		for _, roleName := range c.Add.Roles {
+			role := &models.Role{Name: roleName}
+			if err := role.Load(dbCtx, appCtx.DB); err != nil {
+				return err
+			}
+			roles = append(roles, role)
+		}
+
+		user := &models.User{Name: c.Add.Name, Roles: roles}
 		if err := user.Save(dbCtx, appCtx.DB); err != nil {
 			return aerrors.NewRuntimeError(
 				fmt.Sprintf("failed adding user '%s'", c.Add.Name), err, "")

@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/mr-tron/base58"
 
@@ -14,6 +16,7 @@ import (
 type User struct {
 	ID                uint64
 	Name              string
+	Roles             []*Role
 	PublicKey         *[32]byte
 	PrivateKey        *[32]byte
 	PrivateKeyHashEnc sql.Null[string]
@@ -46,6 +49,23 @@ func (u *User) Save(ctx context.Context, d types.Querier) error {
 		return fmt.Errorf("failed saving role: %w", err)
 	}
 	u.ID = uint64(uID)
+
+	if len(u.Roles) > 0 {
+		stmt := `INSERT INTO users_roles (user_id, role_id) VALUES`
+
+		args := []any{sql.Named("user_id", uID)}
+		values := []string{}
+		for _, role := range u.Roles {
+			values = append(values, `(:user_id, ?)`)
+			args = append(args, role.ID)
+		}
+		stmt = fmt.Sprintf("%s %s", stmt, strings.Join(values, ", "))
+
+		_, err = d.ExecContext(ctx, stmt, args...)
+		if err != nil {
+			return fmt.Errorf("failed saving user roles: %w", err)
+		}
+	}
 
 	return nil
 }
@@ -122,10 +142,34 @@ func (u *User) Delete(ctx context.Context, d types.Querier) error {
 	return nil
 }
 
+// Can returns true if the user is allowed to perform the action on the target.
+func (u *User) Can(action, target string) (bool, error) {
+	if len(u.Roles) == 0 {
+		return false, nil
+	}
+	for _, role := range u.Roles {
+		can, err := role.Can(action, target)
+		if err != nil {
+			return false, err
+		}
+		if can {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 // Users returns one or more users from the database, indexed by their name. An
 // optional filter can be passed to limit the results.
 func Users(ctx context.Context, d types.Querier, filter *types.Filter) (map[string]*User, error) {
-	query := `SELECT u.id, u.name, u.public_key, u.private_key_hash
+	query := `SELECT u.id, u.name, u.public_key, u.private_key_hash,
+		(SELECT group_concat(r.id)
+		FROM roles r
+		INNER JOIN users_roles ur
+			ON ur.role_id = r.id
+			AND ur.user_id = u.id
+		ORDER BY r.name ASC) role_ids
 		FROM users u %s
 		ORDER BY u.name ASC`
 
@@ -145,15 +189,17 @@ func Users(ctx context.Context, d types.Querier, filter *types.Filter) (map[stri
 
 	var user *User
 	users := map[string]*User{}
+	roles := map[string]*Role{}
 	type row struct {
 		ID             uint64
 		UserName       string
 		PubKeyEnc      sql.Null[string]
 		PrivKeyHashEnc sql.Null[string]
+		RoleIDsConcat  sql.Null[string]
 	}
 	for rows.Next() {
 		r := row{}
-		err := rows.Scan(&r.ID, &r.UserName, &r.PubKeyEnc, &r.PrivKeyHashEnc)
+		err := rows.Scan(&r.ID, &r.UserName, &r.PubKeyEnc, &r.PrivKeyHashEnc, &r.RoleIDsConcat)
 		if err != nil {
 			return nil, fmt.Errorf("failed scanning user data: %w", err)
 		}
@@ -170,6 +216,27 @@ func Users(ctx context.Context, d types.Querier, filter *types.Filter) (map[stri
 			}
 
 			users[user.Name] = user
+		}
+
+		if !r.RoleIDsConcat.Valid {
+			continue
+		}
+		roleIDs := strings.Split(r.RoleIDsConcat.V, ",")
+		for _, rIDStr := range roleIDs {
+			if r, ok := roles[rIDStr]; ok {
+				user.Roles = append(user.Roles, r)
+				continue
+			}
+			rID, err := strconv.Atoi(rIDStr)
+			if err != nil {
+				return nil, fmt.Errorf("failed converting role ID %s: %w", rIDStr, err)
+			}
+			role := &Role{ID: uint64(rID)}
+			if err := role.Load(ctx, d); err != nil {
+				return nil, fmt.Errorf("failed loading role ID %d: %w", rID, err)
+			}
+			user.Roles = append(user.Roles, role)
+			roles[rIDStr] = role
 		}
 	}
 

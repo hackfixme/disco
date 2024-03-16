@@ -106,9 +106,7 @@ func (r *Role) Load(ctx context.Context, d types.Querier) error {
 	if len(roles) > 1 {
 		panic(fmt.Sprintf("roles query returned more than 1 role: %d", len(roles)))
 	}
-	for _, role := range roles {
-		*r = *role
-	}
+	*r = *roles[0]
 
 	return nil
 }
@@ -147,9 +145,9 @@ func (r *Role) Delete(ctx context.Context, d types.Querier) error {
 	return nil
 }
 
-// Roles returns one or more roles from the database, indexed by their name. An
-// optional filter can be passed to limit the results.
-func Roles(ctx context.Context, d types.Querier, filter *types.Filter) (map[string]*Role, error) {
+// Roles returns one or more roles from the database. An optional filter can be
+// passed to limit the results.
+func Roles(ctx context.Context, d types.Querier, filter *types.Filter) ([]*Role, error) {
 	query := `SELECT r.id, r.name, rp.action, rp.target
 		FROM roles r
 		LEFT JOIN role_permissions rp
@@ -171,7 +169,7 @@ func Roles(ctx context.Context, d types.Querier, filter *types.Filter) (map[stri
 	}
 
 	var role *Role
-	roles := map[string]*Role{}
+	roles := []*Role{}
 	type row struct {
 		ID       uint64
 		RoleName string
@@ -187,7 +185,7 @@ func Roles(ctx context.Context, d types.Querier, filter *types.Filter) (map[stri
 
 		if role == nil || role.Name != r.RoleName {
 			role = &Role{ID: r.ID, Name: r.RoleName}
-			roles[role.Name] = role
+			roles = append(roles, role)
 		}
 		perm := Permission{}
 		if r.Action.Valid {

@@ -101,9 +101,7 @@ func (u *User) Load(ctx context.Context, d types.Querier) error {
 	if len(users) > 1 {
 		panic(fmt.Sprintf("users query returned more than 1 user: %d", len(users)))
 	}
-	for _, user := range users {
-		*u = *user
-	}
+	*u = *users[0]
 
 	return nil
 }
@@ -160,9 +158,9 @@ func (u *User) Can(action, target string) (bool, error) {
 	return false, nil
 }
 
-// Users returns one or more users from the database, indexed by their name. An
-// optional filter can be passed to limit the results.
-func Users(ctx context.Context, d types.Querier, filter *types.Filter) (map[string]*User, error) {
+// Users returns one or more users from the database. An optional filter can be
+// passed to limit the results.
+func Users(ctx context.Context, d types.Querier, filter *types.Filter) ([]*User, error) {
 	query := `SELECT u.id, u.name, u.public_key, u.private_key_hash,
 		(SELECT group_concat(r.id)
 		FROM roles r
@@ -188,7 +186,7 @@ func Users(ctx context.Context, d types.Querier, filter *types.Filter) (map[stri
 	}
 
 	var user *User
-	users := map[string]*User{}
+	users := []*User{}
 	roles := map[string]*Role{}
 	type row struct {
 		ID             uint64
@@ -215,7 +213,7 @@ func Users(ctx context.Context, d types.Querier, filter *types.Filter) (map[stri
 				user.PrivateKeyHashEnc = r.PrivKeyHashEnc
 			}
 
-			users[user.Name] = user
+			users = append(users, user)
 		}
 
 		if !r.RoleIDsConcat.Valid {

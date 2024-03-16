@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/alecthomas/kong"
 
@@ -70,9 +71,17 @@ func (c *User) Run(kctx *kong.Context, appCtx *actx.Context) error {
 			return aerrors.NewRuntimeError("failed listing users", err, "")
 		}
 
-		for _, user := range users {
-			fmt.Fprintln(appCtx.Stdout, user.Name)
+		data := make([][]string, len(users))
+		for i, user := range users {
+			roles := make([]string, len(user.Roles))
+			for ri, role := range user.Roles {
+				roles[ri] = role.Name
+			}
+			data[i] = []string{user.Name, strings.Join(roles, ",")}
 		}
+
+		header := []string{"Name", "Roles"}
+		newTable(header, data, appCtx.Stdout).Render()
 	}
 
 	return nil

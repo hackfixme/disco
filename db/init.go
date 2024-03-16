@@ -43,22 +43,31 @@ func createRoles(ctx context.Context, d types.Querier) (map[string]*models.Role,
 		{
 			Name: "admin",
 			Permissions: []models.Permission{
-				{ActionPattern: "*", TargetPattern: "*"},
+				{
+					Namespaces:    map[string]struct{}{"*": {}},
+					Actions:       map[models.Action]struct{}{models.ActionAny: {}},
+					TargetPattern: "*",
+				},
 			},
 		},
 		{
 			Name: "node",
 			Permissions: []models.Permission{
-				{ActionPattern: "read", TargetPattern: "store:*"},
+				{
+					Namespaces:    map[string]struct{}{"*": {}},
+					Actions:       map[models.Action]struct{}{models.ActionRead: {}},
+					TargetPattern: "store:*",
+				},
 			},
 		},
 		{
 			Name: "user",
 			Permissions: []models.Permission{
-				{ActionPattern: "read", TargetPattern: "store:*"},
-				{ActionPattern: "write", TargetPattern: "store:*"},
-				{ActionPattern: "create", TargetPattern: "store:*"},
-				{ActionPattern: "delete", TargetPattern: "store:*"},
+				{
+					Namespaces:    map[string]struct{}{"*": {}},
+					Actions:       map[models.Action]struct{}{models.ActionAny: {}},
+					TargetPattern: "store:*",
+				},
 			},
 		},
 	}

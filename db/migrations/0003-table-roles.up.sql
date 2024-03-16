@@ -4,9 +4,10 @@ CREATE TABLE roles (
 );
 
 CREATE TABLE role_permissions (
-  role_id   INTEGER       NOT NULL,
-  action    VARCHAR(32)   NOT NULL,
-  target    VARCHAR(512)  NOT NULL,
+  role_id     INTEGER       NOT NULL,
+  namespaces  VARCHAR(128)  NOT NULL,
+  actions     VARCHAR(16)   NOT NULL,
+  target      VARCHAR(512)  NOT NULL,
   FOREIGN KEY(role_id) REFERENCES roles(id)
 );
 

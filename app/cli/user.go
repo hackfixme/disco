@@ -45,6 +45,12 @@ func (c *User) Run(kctx *kong.Context, appCtx *actx.Context) error {
 			roles = append(roles, role)
 		}
 
+		if len(roles) == 0 {
+			appCtx.Logger.Warn(fmt.Sprintf(
+				"user '%s' has no associated roles and won't be able to "+
+					"access any resources", c.Add.Name))
+		}
+
 		user := &models.User{Name: c.Add.Name, Roles: roles}
 		if err := user.Save(dbCtx, appCtx.DB); err != nil {
 			return aerrors.NewRuntimeError(

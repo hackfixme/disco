@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	actx "go.hackfix.me/disco/app/context"
 	aerrors "go.hackfix.me/disco/app/errors"
 	"go.hackfix.me/disco/db/models"
+	"go.hackfix.me/disco/db/types"
 )
 
 // The Role command manages roles.
@@ -19,7 +21,8 @@ type Role struct {
 		Permissions []models.Permission `arg:"" help:"Permissions to assign to the role. \n Permission format: \"<actions>:<namespaces>:<resource>:<target>\" \n Example: \"rwd:dev,prod:store:myapp/*\""`
 	} `kong:"cmd,help='Add a new role.'"`
 	Rm struct {
-		Name string `arg:"" help:"The unique name of the role."`
+		Name  string `arg:"" help:"The unique name of the role."`
+		Force bool   `help:"Remove role even if it's assigned to existing users."`
 	} `kong:"cmd,help='Remove a role.'"`
 	Modify struct {
 		Name        string              `arg:"" help:"The unique name of the role."`
@@ -42,9 +45,15 @@ func (c *Role) Run(kctx *kong.Context, appCtx *actx.Context) error {
 		}
 	case "rm":
 		role := &models.Role{Name: c.Rm.Name}
-		if err := role.Delete(dbCtx, appCtx.DB); err != nil {
-			return err
+		err := role.Delete(dbCtx, appCtx.DB, c.Rm.Force)
+
+		var errRef *types.ErrReference
+		if errors.As(err, &errRef) {
+			return aerrors.NewRuntimeError(err.Error(), errRef.Cause,
+				"remove all assignments first or pass --force to delete anyway")
 		}
+
+		return err
 	case "modify":
 	case "ls":
 		roles, err := models.Roles(dbCtx, appCtx.DB, nil)

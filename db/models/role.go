@@ -196,7 +196,9 @@ func (r *Role) Load(ctx context.Context, d types.Querier) error {
 
 // Delete removes the role data from the database. Either the user ID or Name
 // must be set for the lookup. It returns an error if the role doesn't exist.
-func (r *Role) Delete(ctx context.Context, d types.Querier) error {
+// If force is true, it will remove the role even if it's currently assigned to
+// existing users.
+func (r *Role) Delete(ctx context.Context, d types.Querier, force bool) error {
 	if r.ID == 0 && r.Name == "" {
 		return fmt.Errorf("failed deleting role: either role ID or Name must be set")
 	}
@@ -211,7 +213,27 @@ func (r *Role) Delete(ctx context.Context, d types.Querier) error {
 		filterStr = fmt.Sprintf("name '%s'", r.Name)
 	}
 
-	// TODO: Handle FKs and cascade
+	if !force {
+		origFilterWhere := filter.Where
+		filter.Where = fmt.Sprintf("r.%s", filter.Where)
+		usersWithRoleCount, err := usersWithRole(ctx, d, filter)
+		if err != nil {
+			return err
+		}
+
+		if usersWithRoleCount > 0 {
+			causeMsg := "%d users have this role"
+			if usersWithRoleCount == 1 {
+				causeMsg = "%d user has this role"
+			}
+			return &types.ErrReference{
+				Msg:   fmt.Sprintf("failed deleting role with %s", filterStr),
+				Cause: fmt.Errorf(causeMsg, usersWithRoleCount),
+			}
+		}
+		filter.Where = origFilterWhere
+	}
+
 	stmt := fmt.Sprintf(`DELETE FROM roles WHERE %s`, filter.Where)
 
 	res, err := d.ExecContext(ctx, stmt, filter.Args...)
@@ -226,6 +248,25 @@ func (r *Role) Delete(ctx context.Context, d types.Querier) error {
 	}
 
 	return nil
+}
+
+func usersWithRole(ctx context.Context, d types.Querier, filter *types.Filter) (int, error) {
+	stmt := fmt.Sprintf(
+		`SELECT COUNT(*)
+		FROM roles r
+		INNER JOIN users_roles ur
+			ON ur.role_id = r.id
+		INNER JOIN users u
+			ON u.id = ur.user_id
+		WHERE %s`, filter.Where)
+
+	var count int
+	err := d.QueryRowContext(ctx, stmt, filter.Args...).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed getting role count: %w", err)
+	}
+
+	return count, nil
 }
 
 // Roles returns one or more roles from the database. An optional filter can be

@@ -23,7 +23,7 @@ type User struct {
 }
 
 // Save stores the user data in the database.
-func (u *User) Save(ctx context.Context, d types.Querier) error {
+func (u *User) Save(ctx context.Context, d types.Querier, update bool) error {
 	var pubKeyEnc sql.Null[string]
 	if u.PublicKey != nil {
 		pubKeyEnc.V = base58.Encode(u.PublicKey[:])
@@ -36,9 +36,15 @@ func (u *User) Save(ctx context.Context, d types.Querier) error {
 		privKeyHashEnc.Valid = true
 		u.PrivateKeyHashEnc = privKeyHashEnc
 	}
-	res, err := d.ExecContext(ctx,
-		`INSERT INTO users (id, name, public_key, private_key_hash)
-		VALUES (NULL, ?, ?, ?)`,
+
+	insertStmt := `INSERT %s INTO users
+		(id, name, public_key, private_key_hash)
+		VALUES (NULL, ?, ?, ?)`
+	replace := ""
+	if update {
+		replace = "OR REPLACE"
+	}
+	res, err := d.ExecContext(ctx, fmt.Sprintf(insertStmt, replace),
 		u.Name, pubKeyEnc, privKeyHashEnc)
 	if err != nil {
 		return fmt.Errorf("failed saving user: %w", err)
@@ -46,14 +52,22 @@ func (u *User) Save(ctx context.Context, d types.Querier) error {
 
 	uID, err := res.LastInsertId()
 	if err != nil {
-		return fmt.Errorf("failed saving role: %w", err)
+		return fmt.Errorf("failed saving user: %w", err)
 	}
 	u.ID = uint64(uID)
+
+	args := []any{sql.Named("user_id", u.ID)}
+	if update {
+		delRoles := `DELETE FROM users_roles WHERE user_id = :user_id`
+		_, err = d.ExecContext(ctx, delRoles, args...)
+		if err != nil {
+			return fmt.Errorf("failed deleting existing user roles: %w", err)
+		}
+	}
 
 	if len(u.Roles) > 0 {
 		stmt := `INSERT INTO users_roles (user_id, role_id) VALUES`
 
-		args := []any{sql.Named("user_id", uID)}
 		values := []string{}
 		for _, role := range u.Roles {
 			values = append(values, `(:user_id, ?)`)

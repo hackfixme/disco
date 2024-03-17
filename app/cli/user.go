@@ -15,15 +15,15 @@ import (
 type User struct {
 	Add struct {
 		Name  string   `arg:"" help:"The unique name of the user."`
-		Roles []string `help:"The roles to associate with this user."`
+		Roles []string `help:"Names of roles to assign to this user."`
 	} `kong:"cmd,help='Add a new user.'"`
 	Rm struct {
 		Name string `arg:"" help:"The unique name of the user."`
 	} `kong:"cmd,help='Remove a user.'"`
-	Modify struct {
+	Update struct {
 		Name  string   `arg:"" help:"The unique name of the user."`
-		Roles []string `help:"The roles to associate with this user."`
-	} `kong:"cmd,help='Change the settings of a user.'"`
+		Roles []string `help:"Names of roles to assign to this user. \n Any existing roles will be removed and replaced with this set."`
+	} `kong:"cmd,help='Update the configuration of a user.'"`
 	Invite struct {
 		Name string `arg:"" help:"The unique name of the user."`
 	} `kong:"cmd,help='Create an invitation token for a user.'"`
@@ -53,7 +53,7 @@ func (c *User) Run(kctx *kong.Context, appCtx *actx.Context) error {
 		}
 
 		user := &models.User{Name: c.Add.Name, Roles: roles}
-		if err := user.Save(dbCtx, appCtx.DB); err != nil {
+		if err := user.Save(dbCtx, appCtx.DB, false); err != nil {
 			return aerrors.NewRuntimeError(
 				fmt.Sprintf("failed adding user '%s'", c.Add.Name), err, "")
 		}
@@ -63,7 +63,27 @@ func (c *User) Run(kctx *kong.Context, appCtx *actx.Context) error {
 		if err != nil {
 			return err
 		}
-	case "modify":
+	case "update":
+		var roles []*models.Role
+		for _, roleName := range c.Update.Roles {
+			role := &models.Role{Name: roleName}
+			if err := role.Load(dbCtx, appCtx.DB); err != nil {
+				return err
+			}
+			roles = append(roles, role)
+		}
+
+		if len(roles) == 0 {
+			appCtx.Logger.Warn(fmt.Sprintf(
+				"user '%s' has no associated roles and won't be able to "+
+					"access any resources", c.Update.Name))
+		}
+
+		user := &models.User{Name: c.Update.Name, Roles: roles}
+		if err := user.Save(dbCtx, appCtx.DB, true); err != nil {
+			return aerrors.NewRuntimeError(
+				fmt.Sprintf("failed adding user '%s'", c.Update.Name), err, "")
+		}
 	case "invite":
 	case "ls":
 		users, err := models.Users(dbCtx, appCtx.DB, nil)

@@ -94,7 +94,7 @@ func createLocalUser(ctx context.Context, d types.Querier, role *models.Role) (*
 		PrivateKey: privKey,
 		Roles:      []*models.Role{role},
 	}
-	if err := user.Save(ctx, d); err != nil {
+	if err := user.Save(ctx, d, false); err != nil {
 		return nil, err
 	}
 

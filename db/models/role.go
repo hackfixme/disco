@@ -88,10 +88,13 @@ type Permission struct {
 }
 
 // Save the role to the database.
-func (r *Role) Save(ctx context.Context, d types.Querier) error {
-	res, err := d.ExecContext(ctx,
-		`INSERT INTO roles (id, name)
-		VALUES (NULL, ?)`, r.Name)
+func (r *Role) Save(ctx context.Context, d types.Querier, update bool) error {
+	insertStmt := `INSERT %s INTO roles (id, name) VALUES (NULL, ?)`
+	replace := ""
+	if update {
+		replace = "OR REPLACE"
+	}
+	res, err := d.ExecContext(ctx, fmt.Sprintf(insertStmt, replace), r.Name)
 	if err != nil {
 		return fmt.Errorf("failed saving role: %w", err)
 	}
@@ -102,8 +105,16 @@ func (r *Role) Save(ctx context.Context, d types.Querier) error {
 	}
 	r.ID = uint64(rID)
 
+	args := []any{sql.Named("role_id", r.ID)}
+	if update {
+		delPerms := `DELETE FROM role_permissions WHERE role_id = :role_id`
+		_, err = d.ExecContext(ctx, delPerms, args...)
+		if err != nil {
+			return fmt.Errorf("failed deleting existing role permissions: %w", err)
+		}
+	}
+
 	stmt := `INSERT INTO role_permissions (role_id, namespaces, actions, target) VALUES `
-	args := []any{sql.Named("role_id", rID)}
 	values := []string{}
 	for _, perm := range r.Permissions {
 		namespaces := make([]string, 0, len(perm.Namespaces))

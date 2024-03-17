@@ -73,7 +73,7 @@ func createRoles(ctx context.Context, d types.Querier) (map[string]*models.Role,
 	}
 	rolesMap := map[string]*models.Role{}
 	for _, role := range roles {
-		if err := role.Save(ctx, d); err != nil {
+		if err := role.Save(ctx, d, false); err != nil {
 			return nil, err
 		}
 		rolesMap[role.Name] = role

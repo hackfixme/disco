@@ -24,9 +24,9 @@ type Role struct {
 		Name  string `arg:"" help:"The unique name of the role."`
 		Force bool   `help:"Remove role even if it's assigned to existing users."`
 	} `kong:"cmd,help='Remove a role.'"`
-	Modify struct {
+	Update struct {
 		Name        string              `arg:"" help:"The unique name of the role."`
-		Permissions []models.Permission `arg:"" help:"Permissions to assign to the role. \n Permission format: \"<actions>:<namespaces>:<resource>:<target>\" \n Example: \"rwd:dev,prod:store:myapp/*\""`
+		Permissions []models.Permission `arg:"" help:"Permissions to assign to the role. \n Any existing permissions will be removed and replaced with this set. \n Permission format: \"<actions>:<namespaces>:<resource>:<target>\" \n Example: \"rwd:dev,prod:store:myapp/*\""`
 	} `kong:"cmd,help='Change the settings of a role.'"`
 	Ls struct {
 	} `kong:"cmd,help='List roles.'"`
@@ -39,7 +39,7 @@ func (c *Role) Run(kctx *kong.Context, appCtx *actx.Context) error {
 	switch kctx.Args[1] {
 	case "add":
 		role := &models.Role{Name: c.Add.Name, Permissions: c.Add.Permissions}
-		if err := role.Save(dbCtx, appCtx.DB); err != nil {
+		if err := role.Save(dbCtx, appCtx.DB, false); err != nil {
 			return aerrors.NewRuntimeError(
 				fmt.Sprintf("failed adding role '%s'", c.Add.Name), err, "")
 		}
@@ -54,7 +54,12 @@ func (c *Role) Run(kctx *kong.Context, appCtx *actx.Context) error {
 		}
 
 		return err
-	case "modify":
+	case "update":
+		role := &models.Role{Name: c.Update.Name, Permissions: c.Update.Permissions}
+		if err := role.Save(dbCtx, appCtx.DB, true); err != nil {
+			return aerrors.NewRuntimeError(
+				fmt.Sprintf("failed adding role '%s'", c.Update.Name), err, "")
+		}
 	case "ls":
 		roles, err := models.Roles(dbCtx, appCtx.DB, nil)
 		if err != nil {

@@ -6,13 +6,15 @@ import (
 	"errors"
 	"strings"
 
+	"go.hackfix.me/disco/db/models"
 	"go.hackfix.me/disco/db/types"
 )
 
 func GetEncryptionPrivKeyHash(ctx context.Context, d types.Querier) (sql.Null[string], error) {
 	var keyHash sql.Null[string]
-	err := d.QueryRowContext(ctx, `SELECT private_key_hash FROM _meta`).
-		Scan(&keyHash)
+	err := d.QueryRowContext(ctx,
+		`SELECT private_key_hash FROM users WHERE type = ?`,
+		models.UserTypeLocal).Scan(&keyHash)
 	if err != nil {
 		return keyHash, err
 	}
@@ -22,8 +24,9 @@ func GetEncryptionPrivKeyHash(ctx context.Context, d types.Querier) (sql.Null[st
 
 func GetEncryptionPubKey(ctx context.Context, d types.Querier) (sql.Null[string], error) {
 	var pubKey sql.Null[string]
-	err := d.QueryRowContext(ctx, `SELECT public_key FROM _meta`).
-		Scan(&pubKey)
+	err := d.QueryRowContext(ctx,
+		`SELECT public_key FROM users WHERE type = ?`,
+		models.UserTypeLocal).Scan(&pubKey)
 	if err != nil {
 		return pubKey, err
 	}

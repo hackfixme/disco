@@ -13,9 +13,17 @@ import (
 	"go.hackfix.me/disco/db/types"
 )
 
+type UserType uint8
+
+const (
+	UserTypeLocal UserType = iota + 1
+	UserTypeRemote
+)
+
 type User struct {
 	ID                uint64
 	Name              string
+	Type              UserType
 	Roles             []*Role
 	PublicKey         *[32]byte
 	PrivateKey        *[32]byte
@@ -38,14 +46,14 @@ func (u *User) Save(ctx context.Context, d types.Querier, update bool) error {
 	}
 
 	insertStmt := `INSERT %s INTO users
-		(id, name, public_key, private_key_hash)
-		VALUES (NULL, ?, ?, ?)`
+		(id, name, type, public_key, private_key_hash)
+		VALUES (NULL, ?, ?, ?, ?)`
 	replace := ""
 	if update {
 		replace = "OR REPLACE"
 	}
 	res, err := d.ExecContext(ctx, fmt.Sprintf(insertStmt, replace),
-		u.Name, pubKeyEnc, privKeyHashEnc)
+		u.Name, u.Type, pubKeyEnc, privKeyHashEnc)
 	if err != nil {
 		return fmt.Errorf("failed saving user: %w", err)
 	}
@@ -174,7 +182,7 @@ func (u *User) Can(action, target string) (bool, error) {
 // Users returns one or more users from the database. An optional filter can be
 // passed to limit the results.
 func Users(ctx context.Context, d types.Querier, filter *types.Filter) ([]*User, error) {
-	query := `SELECT u.id, u.name, u.public_key, u.private_key_hash,
+	query := `SELECT u.id, u.name, u.type, u.public_key, u.private_key_hash,
 		(SELECT group_concat(r.id)
 		FROM roles r
 		INNER JOIN users_roles ur
@@ -204,19 +212,21 @@ func Users(ctx context.Context, d types.Querier, filter *types.Filter) ([]*User,
 	type row struct {
 		ID             uint64
 		UserName       string
+		UserType       UserType
 		PubKeyEnc      sql.Null[string]
 		PrivKeyHashEnc sql.Null[string]
 		RoleIDsConcat  sql.Null[string]
 	}
 	for rows.Next() {
 		r := row{}
-		err := rows.Scan(&r.ID, &r.UserName, &r.PubKeyEnc, &r.PrivKeyHashEnc, &r.RoleIDsConcat)
+		err := rows.Scan(&r.ID, &r.UserName, &r.UserType, &r.PubKeyEnc,
+			&r.PrivKeyHashEnc, &r.RoleIDsConcat)
 		if err != nil {
 			return nil, fmt.Errorf("failed scanning user data: %w", err)
 		}
 
 		if user == nil || user.Name != r.UserName {
-			user = &User{ID: r.ID, Name: r.UserName}
+			user = &User{ID: r.ID, Name: r.UserName, Type: r.UserType}
 			if r.PubKeyEnc.Valid {
 				if user.PublicKey, err = crypto.DecodeKey(r.PubKeyEnc.V); err != nil {
 					return nil, fmt.Errorf("failed decoding public key of user ID %d: %w", r.ID, err)

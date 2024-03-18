@@ -6,17 +6,18 @@ import (
 	aerrors "go.hackfix.me/disco/app/errors"
 	"go.hackfix.me/disco/crypto"
 	"go.hackfix.me/disco/db/queries"
+	"go.hackfix.me/disco/db/types"
 )
 
 // Option is a function that allows configuring the store.
 type Option func(*Store) error
 
 // WithEncryptionKey validates and sets the store encryption key.
-func WithEncryptionKey(privKeyEnc string) Option {
+func WithEncryptionKey(d types.Querier, privKeyEnc string) Option {
 	return func(s *Store) error {
-		privKeyHash, privKeyErr := queries.GetEncryptionPrivKeyHash(s.ctx, s)
+		privKeyHash, privKeyErr := queries.GetEncryptionPrivKeyHash(d.NewContext(), d)
 		if privKeyErr != nil || !privKeyHash.Valid {
-			return aerrors.NewRuntimeError("missing encryption key", nil,
+			return aerrors.NewRuntimeError("missing encryption key", privKeyErr,
 				"Did you forget to run 'disco init'?")
 		}
 

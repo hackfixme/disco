@@ -109,7 +109,7 @@ func WithStore(dataDir string) Option {
 		storeOpts := []sqlite.Option{}
 		if mustValidEncKey {
 			storeOpts = append(storeOpts, sqlite.WithEncryptionKey(
-				app.ctx.Env.Get("DISCO_ENCRYPTION_KEY")))
+				app.ctx.DB, app.ctx.Env.Get("DISCO_ENCRYPTION_KEY")))
 		}
 
 		var err error

@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"fmt"
 
+	"github.com/mr-tron/base58"
+	"go.hackfix.me/disco/crypto"
 	"go.hackfix.me/disco/db/migrator"
 	"go.hackfix.me/disco/db/models"
 	"go.hackfix.me/disco/db/types"
@@ -88,8 +90,10 @@ func createLocalUser(ctx context.Context, d types.Querier, role *models.Role) (*
 		return nil, fmt.Errorf("failed generating encryption key pair: %w", err)
 	}
 
+	pkHash := crypto.Hash("", pubKey[:])
 	user := &models.User{
-		Name:       "local",
+		Name:       base58.Encode(pkHash[:8]),
+		Type:       models.UserTypeLocal,
 		PublicKey:  pubKey,
 		PrivateKey: privKey,
 		Roles:      []*models.Role{role},

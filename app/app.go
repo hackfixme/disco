@@ -2,12 +2,14 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"go.hackfix.me/disco/app/cli"
 	actx "go.hackfix.me/disco/app/context"
 	aerrors "go.hackfix.me/disco/app/errors"
 	"go.hackfix.me/disco/db/models"
+	"go.hackfix.me/disco/db/types"
 )
 
 // App is the application.
@@ -33,10 +35,23 @@ func New(opts ...Option) *App {
 	}
 
 	if app.ctx.User == nil && app.ctx.VersionInit != "" {
-		app.ctx.User = &models.User{Name: "local"}
-		if err := app.ctx.User.Load(app.ctx.DB.NewContext(), app.ctx.DB); err != nil {
+		// NOTE: This *must* load a single user. Currently only a single local
+		// user is created, but in the future this might change.
+		users, err := models.Users(app.ctx.DB.NewContext(), app.ctx.DB,
+			types.NewFilter("u.type = ?", []any{models.UserTypeLocal}))
+		if err != nil {
 			app.FatalIfErrorf(aerrors.NewRuntimeError(
 				"failed loading local user", err, ""))
+		}
+		switch len(users) {
+		case 0:
+			app.FatalIfErrorf(aerrors.NewRuntimeError("local user not found",
+				nil, "Did you forget to run 'disco init'?"))
+		case 1:
+			app.ctx.User = users[0]
+		default:
+			app.FatalIfErrorf(aerrors.NewRuntimeError(
+				fmt.Sprintf("found more than 1 local user: %d", len(users)), nil, ""))
 		}
 	}
 

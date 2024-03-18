@@ -9,6 +9,7 @@ import (
 	actx "go.hackfix.me/disco/app/context"
 	aerrors "go.hackfix.me/disco/app/errors"
 	"go.hackfix.me/disco/db/models"
+	"go.hackfix.me/disco/db/types"
 )
 
 // The User command manages users.
@@ -46,16 +47,18 @@ func (c *User) Run(kctx *kong.Context, appCtx *actx.Context) error {
 			roles = append(roles, role)
 		}
 
-		if len(roles) == 0 {
-			appCtx.Logger.Warn(fmt.Sprintf(
-				"user '%s' has no associated roles and won't be able to "+
-					"access any resources", c.Add.Name))
-		}
-
-		user := &models.User{Name: c.Add.Name, Roles: roles}
+		user := &models.User{Name: c.Add.Name,
+			// Only remote users can be added for now.
+			Type: models.UserTypeRemote, Roles: roles}
 		if err := user.Save(dbCtx, appCtx.DB, false); err != nil {
 			return aerrors.NewRuntimeError(
 				fmt.Sprintf("failed adding user '%s'", c.Add.Name), err, "")
+		}
+
+		if len(roles) == 0 {
+			appCtx.Logger.Warn(fmt.Sprintf(
+				"user '%s' has no assigned roles and won't be able to "+
+					"access any resources", c.Add.Name))
 		}
 	case "rm":
 		user := &models.User{Name: c.Rm.Name}
@@ -73,20 +76,24 @@ func (c *User) Run(kctx *kong.Context, appCtx *actx.Context) error {
 			roles = append(roles, role)
 		}
 
-		if len(roles) == 0 {
-			appCtx.Logger.Warn(fmt.Sprintf(
-				"user '%s' has no associated roles and won't be able to "+
-					"access any resources", c.Update.Name))
-		}
-
-		user := &models.User{Name: c.Update.Name, Roles: roles}
+		user := &models.User{Name: c.Update.Name,
+			// Only remote users can be updated for now.
+			Type: models.UserTypeRemote, Roles: roles}
 		if err := user.Save(dbCtx, appCtx.DB, true); err != nil {
 			return aerrors.NewRuntimeError(
-				fmt.Sprintf("failed adding user '%s'", c.Update.Name), err, "")
+				fmt.Sprintf("failed updating user '%s'", c.Update.Name), err, "")
+		}
+
+		if len(roles) == 0 {
+			appCtx.Logger.Warn(fmt.Sprintf(
+				"user '%s' has no assigned roles and won't be able to "+
+					"access any resources", c.Update.Name))
 		}
 	case "invite":
 	case "ls":
-		users, err := models.Users(dbCtx, appCtx.DB, nil)
+		users, err := models.Users(dbCtx, appCtx.DB,
+			// Local users are hidden for now.
+			types.NewFilter("u.type != ?", []any{models.UserTypeLocal}))
 		if err != nil {
 			return aerrors.NewRuntimeError("failed listing users", err, "")
 		}
@@ -100,8 +107,10 @@ func (c *User) Run(kctx *kong.Context, appCtx *actx.Context) error {
 			data[i] = []string{user.Name, strings.Join(roles, ",")}
 		}
 
-		header := []string{"Name", "Roles"}
-		newTable(header, data, appCtx.Stdout).Render()
+		if len(data) > 0 {
+			header := []string{"Name", "Roles"}
+			newTable(header, data, appCtx.Stdout).Render()
+		}
 	}
 
 	return nil

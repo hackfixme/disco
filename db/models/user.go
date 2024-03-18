@@ -145,6 +145,9 @@ func (u *User) Delete(ctx context.Context, d types.Querier) error {
 		filterStr = fmt.Sprintf("name '%s'", u.Name)
 	}
 
+	// Disable removing local users
+	filter = filter.And(types.NewFilter("type != ?", []any{UserTypeLocal}))
+
 	stmt := fmt.Sprintf(`DELETE FROM users WHERE %s`, filter.Where)
 
 	res, err := d.ExecContext(ctx, stmt, filter.Args...)

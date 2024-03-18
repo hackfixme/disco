@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -45,29 +46,68 @@ func (u *User) Save(ctx context.Context, d types.Querier, update bool) error {
 		u.PrivateKeyHashEnc = privKeyHashEnc
 	}
 
-	insertStmt := `INSERT %s INTO users
+	if update {
+		var filter *types.Filter
+		var filterStr string
+		if u.ID != 0 {
+			filter = &types.Filter{Where: "id = ?", Args: []any{u.ID}}
+			filterStr = fmt.Sprintf("ID %d", u.ID)
+		} else if u.Name != "" {
+			filter = &types.Filter{Where: "name = ?", Args: []any{u.Name}}
+			filterStr = fmt.Sprintf("name '%s'", u.Name)
+		} else {
+			return errors.New("must provide either a user name or ID to update")
+		}
+
+		args := append([]any{u.Type, pubKeyEnc, privKeyHashEnc}, filter.Args...)
+		updateStmt := fmt.Sprintf(`UPDATE users
+			SET type = ?,
+				public_key = ?,
+				private_key_hash = ?
+			WHERE %s`, filter.Where)
+		res, err := d.ExecContext(ctx, updateStmt, args...)
+		if err != nil {
+			return err
+		}
+
+		n, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return fmt.Errorf("user with %s doesn't exist", filterStr)
+		}
+		if n > 1 {
+			return fmt.Errorf("integrity error: updated %d users", n)
+		}
+
+		// Load user to get its ID, but preserve the passed roles.
+		roles := u.Roles
+		if err := u.Load(ctx, d); err != nil {
+			return err
+		}
+		u.Roles = roles
+	} else {
+		insertStmt := `INSERT INTO users
 		(id, name, type, public_key, private_key_hash)
 		VALUES (NULL, ?, ?, ?, ?)`
-	replace := ""
-	if update {
-		replace = "OR REPLACE"
-	}
-	res, err := d.ExecContext(ctx, fmt.Sprintf(insertStmt, replace),
-		u.Name, u.Type, pubKeyEnc, privKeyHashEnc)
-	if err != nil {
-		return fmt.Errorf("failed saving user: %w", err)
-	}
+		res, err := d.ExecContext(ctx, insertStmt, u.Name, u.Type, pubKeyEnc,
+			privKeyHashEnc)
+		if err != nil {
+			return err
+		}
 
-	uID, err := res.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed saving user: %w", err)
+		uID, err := res.LastInsertId()
+		if err != nil {
+			return err
+		}
+		u.ID = uint64(uID)
 	}
-	u.ID = uint64(uID)
 
 	args := []any{sql.Named("user_id", u.ID)}
 	if update {
 		delRoles := `DELETE FROM users_roles WHERE user_id = :user_id`
-		_, err = d.ExecContext(ctx, delRoles, args...)
+		_, err := d.ExecContext(ctx, delRoles, args...)
 		if err != nil {
 			return fmt.Errorf("failed deleting existing user roles: %w", err)
 		}
@@ -83,7 +123,7 @@ func (u *User) Save(ctx context.Context, d types.Querier, update bool) error {
 		}
 		stmt = fmt.Sprintf("%s %s", stmt, strings.Join(values, ", "))
 
-		_, err = d.ExecContext(ctx, stmt, args...)
+		_, err := d.ExecContext(ctx, stmt, args...)
 		if err != nil {
 			return fmt.Errorf("failed saving user roles: %w", err)
 		}

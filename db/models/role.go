@@ -89,26 +89,33 @@ type Permission struct {
 
 // Save the role to the database.
 func (r *Role) Save(ctx context.Context, d types.Querier, update bool) error {
-	insertStmt := `INSERT %s INTO roles (id, name) VALUES (NULL, ?)`
-	replace := ""
 	if update {
-		replace = "OR REPLACE"
-	}
-	res, err := d.ExecContext(ctx, fmt.Sprintf(insertStmt, replace), r.Name)
-	if err != nil {
-		return fmt.Errorf("failed saving role: %w", err)
-	}
+		// The roles table doesn't need to be updated, just the role
+		// permissions. We won't allow role renaming. So just load the role to
+		// get its ID, but preserve the passed permissions.
+		perms := r.Permissions
+		if err := r.Load(ctx, d); err != nil {
+			return err
+		}
+		r.Permissions = perms
+	} else {
+		insertStmt := `INSERT INTO roles (id, name) VALUES (NULL, ?)`
+		res, err := d.ExecContext(ctx, insertStmt, r.Name)
+		if err != nil {
+			return err
+		}
 
-	rID, err := res.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed saving role: %w", err)
+		rID, err := res.LastInsertId()
+		if err != nil {
+			return err
+		}
+		r.ID = uint64(rID)
 	}
-	r.ID = uint64(rID)
 
 	args := []any{sql.Named("role_id", r.ID)}
 	if update {
 		delPerms := `DELETE FROM role_permissions WHERE role_id = :role_id`
-		_, err = d.ExecContext(ctx, delPerms, args...)
+		_, err := d.ExecContext(ctx, delPerms, args...)
 		if err != nil {
 			return fmt.Errorf("failed deleting existing role permissions: %w", err)
 		}
@@ -140,9 +147,9 @@ func (r *Role) Save(ctx context.Context, d types.Querier, update bool) error {
 
 	stmt = fmt.Sprintf("%s %s", stmt, strings.Join(values, ", "))
 
-	_, err = d.ExecContext(ctx, stmt, args...)
+	_, err := d.ExecContext(ctx, stmt, args...)
 	if err != nil {
-		return fmt.Errorf("failed saving role: %w", err)
+		return err
 	}
 
 	return nil
@@ -171,7 +178,7 @@ func (r *Role) Can(action, target string) (bool, error) {
 // for the lookup.
 func (r *Role) Load(ctx context.Context, d types.Querier) error {
 	if r.ID == 0 && r.Name == "" {
-		return errors.New("either user ID or Name must be set")
+		return errors.New("either role ID or Name must be set")
 	}
 
 	var (

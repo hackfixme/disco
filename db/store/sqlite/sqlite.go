@@ -138,6 +138,37 @@ func (s *Store) Set(namespace, key string, value io.Reader) error {
 	return nil
 }
 
+// Delete a key within a specific namespace. An error is returned if the key
+// doesn't exist.
+func (s *Store) Delete(namespace, key string) error {
+	// Validate the table name to ensure it actually exists. This prevents
+	// possible SQL injection attacks, since we parametrize the table name below.
+	allTables, err := queries.GetAllTables(s.NewContext(), s)
+	if err != nil {
+		return err
+	}
+	if _, ok := allTables[namespace]; !ok {
+		return fmt.Errorf("namespace doesn't exist: %s", namespace)
+	}
+
+	// Namespaces are stored in different tables, but parameterization is not
+	// supported for table names, so template it manually.
+	res, err := s.ExecContext(s.ctx,
+		fmt.Sprintf(`DELETE FROM "%s" WHERE key = ?`, namespace), key)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return fmt.Errorf("key doesn't exist: %s", key)
+	}
+
+	return nil
+}
+
 func (s *Store) List(namespace, keyPrefix string) (map[string][]string, error) {
 	// Validate the table name to ensure it actually exists. This prevents
 	// possible SQL injection attacks, since we parametrize the table name below.

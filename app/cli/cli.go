@@ -13,6 +13,7 @@ type CLI struct {
 	Init  Init  `kong:"cmd,help='Initialize the data stores and generate the encryption key.'"`
 	Get   Get   `kong:"cmd,help='Get the value of a key.'"`
 	Set   Set   `kong:"cmd,help='Set the value of a key.'"`
+	Rm    Rm    `kong:"cmd,help='Delete a key.'"`
 	Ls    Ls    `kong:"cmd,help='List keys.'"`
 	Role  Role  `kong:"cmd,help='Manage roles.'"`
 	Serve Serve `kong:"cmd,help='Start the web server.'"`

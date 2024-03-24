@@ -22,6 +22,8 @@ func main() {
 		panic(fmt.Sprintf("failed creating app directory '%s': %s", dataDir, err))
 	}
 
+	// NOTE: The order of the passed options is significant, as some options depend
+	// on the values set by previous ones.
 	app.New(
 		app.WithExit(os.Exit),
 		app.WithArgs(os.Args[1:]),
@@ -37,6 +39,7 @@ func main() {
 			isatty.IsTerminal(os.Stderr.Fd()),
 		),
 		app.WithDB(dataDir),
+		app.WithLocalUser(nil),
 		app.WithStore(dataDir),
 	).Run()
 }

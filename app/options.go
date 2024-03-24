@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"path/filepath"
+	"slices"
 
 	"github.com/lmittmann/tint"
 	"github.com/mandelsoft/vfs/pkg/vfs"
@@ -79,6 +80,26 @@ func WithFS(fs vfs.FileSystem) Option {
 	}
 }
 
+// WithLocalUser sets or loads the local user of the app.
+func WithLocalUser(user *models.User) Option {
+	return func(app *App) {
+		if user != nil {
+			app.ctx.User = user
+			return
+		}
+
+		// Only load the local user if we're currrently not initializing.
+		if len(app.args) > 0 && app.args[0] != "init" {
+			// The encryption key is only required for specific commands.
+			readEncKey := (app.args[0] == "get" ||
+				app.args[0] == "set" || app.args[0] == "serve" ||
+				(len(app.args) > 1 && slices.Equal(app.args[0:2], []string{"invite", "user"})))
+			err := app.ctx.LoadLocalUser(readEncKey)
+			app.FatalIfErrorf(err)
+		}
+	}
+}
+
 // WithLogger initializes the logger used by the application.
 func WithLogger(isStdoutTTY, isStderrTTY bool) Option {
 	return func(app *App) {
@@ -103,13 +124,9 @@ func WithStore(dataDir string) Option {
 			storePath = filepath.Join(dataDir, "store.db")
 		}
 
-		mustValidEncKey := len(app.args) > 0 && (app.args[0] == "get" ||
-			app.args[0] == "set" || app.args[0] == "serve")
-
 		storeOpts := []sqlite.Option{}
-		if mustValidEncKey {
-			storeOpts = append(storeOpts, sqlite.WithEncryptionKey(
-				app.ctx.DB, app.ctx.Env.Get("DISCO_ENCRYPTION_KEY")))
+		if app.ctx.User != nil {
+			storeOpts = append(storeOpts, sqlite.WithEncryptionKey(app.ctx.User.PrivateKey))
 		}
 
 		var err error

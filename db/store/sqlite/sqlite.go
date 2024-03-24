@@ -24,7 +24,7 @@ var migrationsFS embed.FS
 type Store struct {
 	*sql.DB
 	ctx              context.Context
-	privKey          *[32]byte
+	encKey           *[32]byte
 	migrations       []*migrator.Migration
 	validTableNameRx *regexp.Regexp
 }
@@ -86,7 +86,7 @@ func (s *Store) Get(namespace, key string) (ok bool, value io.Reader, err error)
 		return false, nil, err
 	}
 
-	decValue, err := crypto.DecryptSym(bytes.NewReader(encValue), s.privKey)
+	decValue, err := crypto.DecryptSym(bytes.NewReader(encValue), s.encKey)
 	if err != nil {
 		return true, nil, aerrors.NewRuntimeError("failed decrypting value", err, "")
 	}
@@ -117,7 +117,7 @@ func (s *Store) Set(namespace, key string, value io.Reader) error {
 		}
 	}
 
-	encData, err := crypto.EncryptSym(value, s.privKey)
+	encData, err := crypto.EncryptSym(value, s.encKey)
 	if err != nil {
 		return aerrors.NewRuntimeError("failed encrypting value", err, "")
 	}

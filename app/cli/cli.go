@@ -10,14 +10,15 @@ import (
 type CLI struct {
 	Ctx *kong.Context `kong:"-"`
 
-	Init  Init  `kong:"cmd,help='Initialize the data stores and generate the encryption key.'"`
-	Get   Get   `kong:"cmd,help='Get the value of a key.'"`
-	Set   Set   `kong:"cmd,help='Set the value of a key.'"`
-	Rm    Rm    `kong:"cmd,help='Delete a key.'"`
-	Ls    Ls    `kong:"cmd,help='List keys.'"`
-	Role  Role  `kong:"cmd,help='Manage roles.'"`
-	Serve Serve `kong:"cmd,help='Start the web server.'"`
-	User  User  `kong:"cmd,help='Manage users.'"`
+	Init   Init   `kong:"cmd,help='Initialize the data stores and generate the encryption key.'"`
+	Get    Get    `kong:"cmd,help='Get the value of a key.'"`
+	Set    Set    `kong:"cmd,help='Set the value of a key.'"`
+	Rm     Rm     `kong:"cmd,help='Delete a key.'"`
+	Ls     Ls     `kong:"cmd,help='List keys.'"`
+	Role   Role   `kong:"cmd,help='Manage roles.'"`
+	Serve  Serve  `kong:"cmd,help='Start the web server.'"`
+	User   User   `kong:"cmd,help='Manage users.'"`
+	Invite Invite `kong:"cmd,help='Manage invitations for remote users.'"`
 
 	EncryptionKey string `kong:"help='32-byte private key used for encrypting and decrypting the local data store, encoded in base 58. '"`
 }

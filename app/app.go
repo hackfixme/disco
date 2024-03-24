@@ -34,6 +34,13 @@ func New(opts ...Option) *App {
 		opt(app)
 	}
 
+	uuidgen, err := actx.NewUUIDGenerator(12)
+	if err != nil {
+		app.FatalIfErrorf(aerrors.NewRuntimeError(
+			"failed creating UUID generation function", err, ""))
+	}
+	app.ctx.UUIDGen = uuidgen
+
 	if app.ctx.User == nil && app.ctx.VersionInit != "" {
 		// NOTE: This *must* load a single user. Currently only a single local
 		// user is created, but in the future this might change.
@@ -43,6 +50,7 @@ func New(opts ...Option) *App {
 			app.FatalIfErrorf(aerrors.NewRuntimeError(
 				"failed loading local user", err, ""))
 		}
+
 		switch len(users) {
 		case 0:
 			app.FatalIfErrorf(aerrors.NewRuntimeError("local user not found",
@@ -58,10 +66,8 @@ func New(opts ...Option) *App {
 	slog.SetDefault(app.ctx.Logger)
 
 	cli := &cli.CLI{}
-	err := cli.Setup(app.ctx, app.args, app.Exit)
-	if err != nil {
-		app.FatalIfErrorf(err)
-	}
+	err = cli.Setup(app.ctx, app.args, app.Exit)
+	app.FatalIfErrorf(err)
 	app.cli = cli
 
 	return app

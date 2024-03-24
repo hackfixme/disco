@@ -22,6 +22,7 @@ type Context struct {
 	FS          vfs.FileSystem
 	Env         Environment
 	Logger      *slog.Logger
+	UUIDGen     func() string
 
 	// Standard streams
 	Stdin  io.Reader

@@ -1,6 +1,6 @@
 CREATE TABLE roles (
-  id         INTEGER      PRIMARY KEY,
-  name       VARCHAR(32)  UNIQUE NOT NULL
+  id     INTEGER      PRIMARY KEY,
+  name   VARCHAR(32)  UNIQUE NOT NULL
 );
 
 CREATE TABLE role_permissions (

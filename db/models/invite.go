@@ -99,7 +99,47 @@ func (inv *Invite) Delete(ctx context.Context, d types.Querier) error {
 // Invites returns one or more invites from the database. An optional filter can
 // be passed to limit the results.
 func Invites(ctx context.Context, d types.Querier, filter *types.Filter) ([]*Invite, error) {
+	query := `SELECT inv.id, inv.uuid, inv.created_at, inv.expires, inv.user_id, inv.token, inv.privkey_enc
+		FROM invites inv
+		%s ORDER BY inv.expires ASC`
+
+	where := "1=1"
+	args := []any{}
+	if filter != nil {
+		where = filter.Where
+		args = filter.Args
+	}
+
+	query = fmt.Sprintf(query, fmt.Sprintf("WHERE %s", where))
+
+	rows, err := d.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed loading invites: %w", err)
+	}
+
 	invites := []*Invite{}
+	users := map[uint64]*User{}
+	for rows.Next() {
+		inv := Invite{}
+		var userID uint64
+		err := rows.Scan(&inv.ID, &inv.UUID, &inv.CreatedAt, &inv.Expires, &userID, &inv.Token, &inv.privKeyEnc)
+		if err != nil {
+			return nil, fmt.Errorf("failed scanning invite data: %w", err)
+		}
+
+		// TODO: Load users in the same query for efficiency
+		user, ok := users[userID]
+		if !ok {
+			user = &User{ID: userID}
+			if err = user.Load(ctx, d); err != nil {
+				return nil, fmt.Errorf("failed loading invite user: %w", err)
+			}
+			users[userID] = user
+		}
+
+		inv.User = user
+		invites = append(invites, &inv)
+	}
 
 	return invites, nil
 }

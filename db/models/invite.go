@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mr-tron/base58"
+	"github.com/nrednav/cuid2"
 	"go.hackfix.me/disco/crypto"
 	"go.hackfix.me/disco/db/types"
 )
@@ -86,11 +87,61 @@ func (inv *Invite) Load(ctx context.Context, d types.Querier) error {
 	return nil
 }
 
-// Delete removes the invite record from the database. The invite ID must be set
-// for the lookup. It returns an error if the invite doesn't exist.
+// Delete removes the invite record from the database. Either the invite ID or
+// UUID must be set for the lookup. The UUID may be a prefix, as long as it
+// matches exactly one record. It returns an error if the invite doesn't exist,
+// or if more than one record would be deleted.
 func (inv *Invite) Delete(ctx context.Context, d types.Querier) error {
-	if inv.ID == 0 {
-		return fmt.Errorf("failed loading invite: the invite ID must be set")
+	if inv.ID == 0 && inv.UUID == "" {
+		return fmt.Errorf("failed deleting invite: either invite ID or UUID must be set")
+	}
+
+	var filter *types.Filter
+	var filterStr string
+	if inv.ID != 0 {
+		filter = &types.Filter{Where: "id = ?", Args: []any{inv.ID}}
+		filterStr = fmt.Sprintf("ID %d", inv.ID)
+	} else if inv.UUID != "" {
+		if !cuid2.IsCuid(inv.UUID) {
+			return fmt.Errorf("invalid invite UUID: '%s'", inv.UUID)
+		}
+		if len(inv.UUID) < 12 {
+			filter = &types.Filter{Where: "uuid LIKE ?", Args: []any{fmt.Sprintf("%s%%", inv.UUID)}}
+			filterStr = fmt.Sprintf("UUID '%s*'", inv.UUID)
+			if err := validateInviteDelete(ctx, d, filter, filterStr); err != nil {
+				return err
+			}
+		} else {
+			filter = &types.Filter{Where: "uuid = ?", Args: []any{inv.UUID}}
+			filterStr = fmt.Sprintf("UUID '%s'", inv.UUID)
+		}
+	}
+
+	stmt := fmt.Sprintf(`DELETE FROM invites WHERE %s`, filter.Where)
+	res, err := d.ExecContext(ctx, stmt, filter.Args...)
+	if err != nil {
+		return fmt.Errorf("failed deleting invite with %s: %w", filterStr, err)
+	}
+
+	if n, err := res.RowsAffected(); err != nil {
+		return err
+	} else if n == 0 {
+		return types.ErrNoResult{Msg: fmt.Sprintf("invite with %s doesn't exist", filterStr)}
+	}
+
+	return nil
+}
+
+func validateInviteDelete(ctx context.Context, d types.Querier, filter *types.Filter, filterStr string) error {
+	checkQ := fmt.Sprintf(`SELECT COUNT(*) FROM invites WHERE %s`, filter.Where)
+	var toDeleteCount int
+	err := d.QueryRowContext(ctx, checkQ, filter.Args...).Scan(&toDeleteCount)
+	if err != nil {
+		return fmt.Errorf("failed validating invite deletion: %w", err)
+	}
+
+	if toDeleteCount > 1 {
+		return fmt.Errorf("invite filter %s would delete %d invites; make the filter more specific", filterStr, toDeleteCount)
 	}
 
 	return nil

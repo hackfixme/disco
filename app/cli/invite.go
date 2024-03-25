@@ -21,11 +21,11 @@ type Invite struct {
 	Ls struct {
 	} `kong:"cmd,help='List invites.'"`
 	Rm struct {
-		ID string `arg:"" help:"The unique invite ID. A short prefix can be specified as long as it's unique."`
+		UUID string `arg:"" help:"The unique invite ID. A short prefix can be specified as long as it's unique."`
 	} `kong:"cmd,help='Delete an unredeemed invite.'"`
 	Reset struct {
-		ID  string        `arg:"" help:"The unique invite ID. A short prefix can be specified as long as it's unique."`
-		TTL time.Duration `default:"1h" help:"Time duration the invite is valid for."`
+		UUID string        `arg:"" help:"The unique invite ID. A short prefix can be specified as long as it's unique."`
+		TTL  time.Duration `default:"1h" help:"Time duration the invite is valid for."`
 	} `kong:"cmd,help='Reset an invite to extend its validity period.'"`
 }
 
@@ -82,6 +82,10 @@ Expires: %s
 		}
 
 	case "rm":
+		inv := &models.Invite{UUID: c.Rm.UUID}
+		if err := inv.Delete(dbCtx, appCtx.DB); err != nil {
+			return err
+		}
 	case "reset":
 	}
 

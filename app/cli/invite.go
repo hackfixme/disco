@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -23,10 +24,10 @@ type Invite struct {
 	Rm struct {
 		UUID string `arg:"" help:"The unique invite ID. A short prefix can be specified as long as it's unique."`
 	} `kong:"cmd,help='Delete an unredeemed invite.'"`
-	Reset struct {
-		UUID string        `arg:"" help:"The unique invite ID. A short prefix can be specified as long as it's unique."`
-		TTL  time.Duration `default:"1h" help:"Time duration the invite is valid for."`
-	} `kong:"cmd,help='Reset an invite to extend its validity period.'"`
+	Update struct {
+		UUID string         `arg:"" help:"The unique invite ID."`
+		TTL  *time.Duration `help:"Time duration the invite is valid for."`
+	} `kong:"cmd,help='Update an invite to extend its validity period.'"`
 }
 
 // Run the invite command.
@@ -46,7 +47,7 @@ func (c *Invite) Run(kctx *kong.Context, appCtx *actx.Context) error {
 				fmt.Sprintf("failed creating invite for user '%s'", c.User.Name), err, "")
 		}
 
-		if err := inv.Save(dbCtx, appCtx.DB); err != nil {
+		if err := inv.Save(dbCtx, appCtx.DB, false); err != nil {
 			return aerrors.NewRuntimeError(
 				"failed saving invite to the database", err, "")
 		}
@@ -86,7 +87,17 @@ Expires: %s
 		if err := inv.Delete(dbCtx, appCtx.DB); err != nil {
 			return err
 		}
-	case "reset":
+
+	case "update":
+		if c.Update.TTL == nil {
+			return errors.New("must set a valid TTL")
+		}
+
+		newExpiration := time.Now().UTC().Add(*c.Update.TTL)
+		inv := &models.Invite{UUID: c.Update.UUID, Expires: newExpiration}
+		if err := inv.Save(dbCtx, appCtx.DB, true); err != nil {
+			return err
+		}
 	}
 
 	return nil

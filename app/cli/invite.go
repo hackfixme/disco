@@ -9,6 +9,7 @@ import (
 	actx "go.hackfix.me/disco/app/context"
 	aerrors "go.hackfix.me/disco/app/errors"
 	"go.hackfix.me/disco/db/models"
+	"go.hackfix.me/disco/db/types"
 )
 
 // The Invite command manages invitations for remote users.
@@ -50,10 +51,36 @@ func (c *Invite) Run(kctx *kong.Context, appCtx *actx.Context) error {
 				"failed saving invite to the database", err, "")
 		}
 
+		timeLeft := inv.Expires.Sub(time.Now().UTC())
+		expFmt := fmt.Sprintf("%s (%s)",
+			inv.Expires.Local().Format(time.DateTime),
+			timeLeft.Round(time.Second))
 		fmt.Fprintf(appCtx.Stdout, `Token: %s
 Expires: %s
-	`, inv.Token, inv.Expires.Local())
+	`, inv.Token, expFmt)
+
 	case "ls":
+		now := time.Now().UTC()
+		invites, err := models.Invites(dbCtx, appCtx.DB,
+			types.NewFilter("inv.expires > ?", []any{now}))
+		if err != nil {
+			return aerrors.NewRuntimeError("failed listing invites", err, "")
+		}
+
+		data := make([][]string, len(invites))
+		for i, inv := range invites {
+			timeLeft := inv.Expires.Sub(now)
+			expFmt := fmt.Sprintf("%s (%s)",
+				inv.Expires.Local().Format(time.DateTime),
+				timeLeft.Round(time.Second))
+			data[i] = []string{inv.UUID, inv.User.Name, inv.Token, expFmt}
+		}
+
+		if len(data) > 0 {
+			header := []string{"UUID", "User", "Token", "Expiration"}
+			newTable(header, data, appCtx.Stdout).Render()
+		}
+
 	case "rm":
 	case "reset":
 	}

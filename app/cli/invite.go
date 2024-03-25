@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/alecthomas/kong"
@@ -20,6 +21,7 @@ type Invite struct {
 		TTL  time.Duration `default:"1h" help:"Time duration the invite is valid for."`
 	} `kong:"cmd,help='Create a new invitation token for an existing user to access this Disco node remotely.'"`
 	Ls struct {
+		All bool `help:"Also include expired invites."`
 	} `kong:"cmd,help='List invites.'"`
 	Rm struct {
 		UUID string `arg:"" help:"The unique invite ID. A short prefix can be specified as long as it's unique."`
@@ -62,19 +64,38 @@ Expires: %s
 
 	case "ls":
 		now := time.Now().UTC()
-		invites, err := models.Invites(dbCtx, appCtx.DB,
-			types.NewFilter("inv.expires > ?", []any{now}))
+		var filter *types.Filter
+		if !c.Ls.All {
+			filter = types.NewFilter("inv.expires > ?", []any{now})
+		}
+		invites, err := models.Invites(dbCtx, appCtx.DB, filter)
 		if err != nil {
 			return aerrors.NewRuntimeError("failed listing invites", err, "")
 		}
 
-		data := make([][]string, len(invites))
-		for i, inv := range invites {
+		expired, active := [][]string{}, [][]string{}
+		for _, inv := range invites {
 			timeLeft := inv.Expires.Sub(now)
-			expFmt := fmt.Sprintf("%s (%s)",
-				inv.Expires.Local().Format(time.DateTime),
-				timeLeft.Round(time.Second))
-			data[i] = []string{inv.UUID, inv.User.Name, inv.Token, expFmt}
+
+			if timeLeft > 0 {
+				expFmt := fmt.Sprintf("%s (%s)",
+					inv.Expires.Local().Format(time.DateTime),
+					timeLeft.Round(time.Second))
+				active = append(active, []string{inv.UUID, inv.User.Name, inv.Token, expFmt})
+			} else {
+				expFmt := fmt.Sprintf("%s (expired)",
+					inv.Expires.Local().Format(time.DateTime))
+				expired = append(expired, []string{inv.UUID, inv.User.Name, inv.Token, expFmt})
+			}
+		}
+
+		data := active
+		if len(expired) > 0 {
+			if len(data) > 0 {
+				data = slices.Concat(data, [][]string{{""}}, expired)
+			} else {
+				data = expired
+			}
 		}
 
 		if len(data) > 0 {

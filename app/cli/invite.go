@@ -27,7 +27,7 @@ type Invite struct {
 		UUID []string `arg:"" help:"Unique invite IDs. A short prefix can be specified as long as it's unique."`
 	} `kong:"cmd,help='Delete one or more invites.'"`
 	Update struct {
-		UUID string         `arg:"" help:"The unique invite ID."`
+		UUID string         `arg:"" help:"The unique invite ID. A short prefix can be specified as long as it's unique."`
 		TTL  *time.Duration `help:"Time duration the invite is valid for."`
 	} `kong:"cmd,help='Update an invite to extend its validity period.'"`
 }

@@ -69,7 +69,10 @@ func NewInvite(user *User, ttl time.Duration, uuidgen func() string, encryptionK
 	}, nil
 }
 
-// Save stores the invite data in the database.
+// Save stores the invite data in the database. If update is true, either the
+// invite ID or UUID must be set for the lookup. The UUID may be a prefix, as
+// long as it matches exactly one record. It returns an error if the invite
+// doesn't exist, or if more than one record would be updated.
 func (inv *Invite) Save(ctx context.Context, d types.Querier, update bool) error {
 	var (
 		stmt      string
@@ -83,8 +86,21 @@ func (inv *Invite) Save(ctx context.Context, d types.Querier, update bool) error
 			filter = &types.Filter{Where: "id = ?", Args: []any{inv.ID}}
 			filterStr = fmt.Sprintf("ID %d", inv.ID)
 		} else if inv.UUID != "" {
-			filter = &types.Filter{Where: "uuid = ?", Args: []any{inv.UUID}}
-			filterStr = fmt.Sprintf("UUID '%s'", inv.UUID)
+			if !cuid2.IsCuid(inv.UUID) {
+				return fmt.Errorf("invalid invite UUID: '%s'", inv.UUID)
+			}
+			if len(inv.UUID) < 12 {
+				filter = &types.Filter{Where: "uuid LIKE ?", Args: []any{fmt.Sprintf("%s%%", inv.UUID)}}
+				filterStr = fmt.Sprintf("UUID '%s*'", inv.UUID)
+				if count, err := filterCount(ctx, d, "invites", filter); err != nil {
+					return err
+				} else if count > 1 {
+					return fmt.Errorf("invite filter %s would update %d invites; make the filter more specific", filterStr, count)
+				}
+			} else {
+				filter = &types.Filter{Where: "uuid = ?", Args: []any{inv.UUID}}
+				filterStr = fmt.Sprintf("UUID '%s'", inv.UUID)
+			}
 		} else {
 			return errors.New("must provide either an invite ID or UUID to update")
 		}
@@ -147,8 +163,10 @@ func (inv *Invite) Delete(ctx context.Context, d types.Querier) error {
 		if len(inv.UUID) < 12 {
 			filter = &types.Filter{Where: "uuid LIKE ?", Args: []any{fmt.Sprintf("%s%%", inv.UUID)}}
 			filterStr = fmt.Sprintf("UUID '%s*'", inv.UUID)
-			if err := validateInviteDelete(ctx, d, filter, filterStr); err != nil {
+			if count, err := filterCount(ctx, d, "invites", filter); err != nil {
 				return err
+			} else if count > 1 {
+				return fmt.Errorf("invite filter %s would delete %d invites; make the filter more specific", filterStr, count)
 			}
 		} else {
 			filter = &types.Filter{Where: "uuid = ?", Args: []any{inv.UUID}}
@@ -166,21 +184,6 @@ func (inv *Invite) Delete(ctx context.Context, d types.Querier) error {
 		return err
 	} else if n == 0 {
 		return types.ErrNoResult{Msg: fmt.Sprintf("invite with %s doesn't exist", filterStr)}
-	}
-
-	return nil
-}
-
-func validateInviteDelete(ctx context.Context, d types.Querier, filter *types.Filter, filterStr string) error {
-	checkQ := fmt.Sprintf(`SELECT COUNT(*) FROM invites WHERE %s`, filter.Where)
-	var toDeleteCount int
-	err := d.QueryRowContext(ctx, checkQ, filter.Args...).Scan(&toDeleteCount)
-	if err != nil {
-		return fmt.Errorf("failed validating invite deletion: %w", err)
-	}
-
-	if toDeleteCount > 1 {
-		return fmt.Errorf("invite filter %s would delete %d invites; make the filter more specific", filterStr, toDeleteCount)
 	}
 
 	return nil

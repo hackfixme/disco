@@ -6,7 +6,7 @@ import (
 	"crypto/ecdh"
 	"crypto/rand"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"slices"
 	"time"
 
@@ -23,14 +23,17 @@ type Invite struct {
 	User      *User
 	Token     string
 
-	privKey *ecdh.PrivateKey
+	// Encrypted X25519 private key
+	privKeyEnc []byte
 }
 
 // NewInvite creates a new invitation for a remote user. A unique token is
 // created that must be supplied when authenticating to the server. The token is
-// constructed by concatenating random 32 bytes and an ephemeral Curve25519
-// public key used for ECDH, encoded as a base 58 string.
-func NewInvite(user *User, ttl time.Duration, uuidgen func() string) (*Invite, error) {
+// constructed by concatenating random 32 bytes and an ephemeral X25519
+// public key, encoded as a base 58 string.
+// The encryptionKey is a separate persistent symmetric key used for encrypting
+// the X25519 private key.
+func NewInvite(user *User, ttl time.Duration, uuidgen func() string, encryptionKey *[32]byte) (*Invite, error) {
 	privKey, err := ecdh.X25519().GenerateKey(rand.Reader)
 	if err != nil {
 		return nil, err
@@ -40,35 +43,35 @@ func NewInvite(user *User, ttl time.Duration, uuidgen func() string) (*Invite, e
 		return nil, err
 	}
 
+	privKeyR := bytes.NewReader(privKey.Bytes())
+	privKeyEnc, err := crypto.EncryptSym(privKeyR, encryptionKey)
+	if err != nil {
+		return nil, err
+	}
+	privKeyEncData, err := io.ReadAll(privKeyEnc)
+	if err != nil {
+		return nil, err
+	}
+
 	createdAt := time.Now().UTC()
 	expires := createdAt.Add(ttl)
 	token := base58.Encode(slices.Concat(b, privKey.PublicKey().Bytes()))
 
 	return &Invite{
-		UUID:      uuidgen(),
-		CreatedAt: createdAt,
-		Expires:   expires,
-		User:      user,
-		Token:     token,
-		privKey:   privKey,
+		UUID:       uuidgen(),
+		CreatedAt:  createdAt,
+		Expires:    expires,
+		User:       user,
+		Token:      token,
+		privKeyEnc: privKeyEncData,
 	}, nil
 }
 
-// Save stores the invite data in the database. The encryption key is used to
-// encrypt the ephemeral X25519 private key.
-func (inv *Invite) Save(ctx context.Context, d types.Querier, encryptionKey *[32]byte) error {
-	privKeyR := bytes.NewReader(inv.privKey.Bytes())
-	privKeyEnc, err := crypto.EncryptSym(privKeyR, encryptionKey)
-	if err != nil {
-		return err
-	}
-	privKeyEncData, err := ioutil.ReadAll(privKeyEnc)
-	if err != nil {
-		return err
-	}
+// Save stores the invite data in the database.
+func (inv *Invite) Save(ctx context.Context, d types.Querier) error {
 	stmt := `INSERT INTO invites (id, uuid, created_at, expires, user_id, token, privkey_enc)
 			VALUES (NULL, ?, ?, ?, ?, ?, ?)`
-	_, err = d.ExecContext(ctx, stmt, inv.UUID, inv.CreatedAt, inv.Expires, inv.User.ID, inv.Token, privKeyEncData)
+	_, err := d.ExecContext(ctx, stmt, inv.UUID, inv.CreatedAt, inv.Expires, inv.User.ID, inv.Token, inv.privKeyEnc)
 
 	return err
 }

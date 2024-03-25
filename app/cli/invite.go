@@ -39,13 +39,13 @@ func (c *Invite) Run(kctx *kong.Context, appCtx *actx.Context) error {
 			return aerrors.NewRuntimeError(
 				fmt.Sprintf("failed loading user '%s'", c.User.Name), err, "")
 		}
-		inv, err := models.NewInvite(user, c.User.TTL, appCtx.UUIDGen)
+		inv, err := models.NewInvite(user, c.User.TTL, appCtx.UUIDGen, appCtx.User.PrivateKey)
 		if err != nil {
 			return aerrors.NewRuntimeError(
 				fmt.Sprintf("failed creating invite for user '%s'", c.User.Name), err, "")
 		}
 
-		if err := inv.Save(dbCtx, appCtx.DB, appCtx.User.PrivateKey); err != nil {
+		if err := inv.Save(dbCtx, appCtx.DB); err != nil {
 			return aerrors.NewRuntimeError(
 				"failed saving invite to the database", err, "")
 		}

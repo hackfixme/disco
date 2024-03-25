@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ecdh"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"slices"
@@ -69,10 +70,48 @@ func NewInvite(user *User, ttl time.Duration, uuidgen func() string, encryptionK
 }
 
 // Save stores the invite data in the database.
-func (inv *Invite) Save(ctx context.Context, d types.Querier) error {
-	stmt := `INSERT INTO invites (id, uuid, created_at, expires, user_id, token, privkey_enc)
-			VALUES (NULL, ?, ?, ?, ?, ?, ?)`
-	_, err := d.ExecContext(ctx, stmt, inv.UUID, inv.CreatedAt, inv.Expires, inv.User.ID, inv.Token, inv.privKeyEnc)
+func (inv *Invite) Save(ctx context.Context, d types.Querier, update bool) error {
+	var (
+		stmt      string
+		filterStr string
+		op        string
+		args      = make([]any, 0)
+	)
+	if update {
+		var filter *types.Filter
+		if inv.ID != 0 {
+			filter = &types.Filter{Where: "id = ?", Args: []any{inv.ID}}
+			filterStr = fmt.Sprintf("ID %d", inv.ID)
+		} else if inv.UUID != "" {
+			filter = &types.Filter{Where: "uuid = ?", Args: []any{inv.UUID}}
+			filterStr = fmt.Sprintf("UUID '%s'", inv.UUID)
+		} else {
+			return errors.New("must provide either an invite ID or UUID to update")
+		}
+		stmt = fmt.Sprintf(`UPDATE invites SET expires = ? WHERE %s`, filter.Where)
+		args = append(args, inv.Expires)
+		args = append(args, filter.Args...)
+		op = fmt.Sprintf("updating invite with %s", filterStr)
+	} else {
+		stmt = `INSERT INTO invites (
+				id, uuid, created_at, expires, user_id, token, privkey_enc)
+				VALUES (NULL, ?, ?, ?, ?, ?, ?)`
+		args = append(args, inv.UUID, inv.CreatedAt, inv.Expires, inv.User.ID, inv.Token, inv.privKeyEnc)
+		op = "saving new invite"
+	}
+
+	res, err := d.ExecContext(ctx, stmt, args...)
+	if err != nil {
+		return fmt.Errorf("failed %s: %w", op, err)
+	}
+
+	if update {
+		if n, err := res.RowsAffected(); err != nil {
+			return err
+		} else if n == 0 {
+			return types.ErrNoResult{Msg: fmt.Sprintf("invite with %s doesn't exist", filterStr)}
+		}
+	}
 
 	return err
 }

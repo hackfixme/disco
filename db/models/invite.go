@@ -78,31 +78,16 @@ func (inv *Invite) Save(ctx context.Context, d types.Querier, update bool) error
 		stmt      string
 		filterStr string
 		op        string
-		args      = make([]any, 0)
+		args      = []any{}
 	)
 	if update {
-		var filter *types.Filter
-		if inv.ID != 0 {
-			filter = &types.Filter{Where: "id = ?", Args: []any{inv.ID}}
-			filterStr = fmt.Sprintf("ID %d", inv.ID)
-		} else if inv.UUID != "" {
-			if !cuid2.IsCuid(inv.UUID) {
-				return fmt.Errorf("invalid invite UUID: '%s'", inv.UUID)
-			}
-			if len(inv.UUID) < 12 {
-				filter = &types.Filter{Where: "uuid LIKE ?", Args: []any{fmt.Sprintf("%s%%", inv.UUID)}}
-				filterStr = fmt.Sprintf("UUID '%s*'", inv.UUID)
-				if count, err := filterCount(ctx, d, "invites", filter); err != nil {
-					return err
-				} else if count > 1 {
-					return fmt.Errorf("invite filter %s would update %d invites; make the filter more specific", filterStr, count)
-				}
-			} else {
-				filter = &types.Filter{Where: "uuid = ?", Args: []any{inv.UUID}}
-				filterStr = fmt.Sprintf("UUID '%s'", inv.UUID)
-			}
-		} else {
-			return errors.New("must provide either an invite ID or UUID to update")
+		var (
+			filter *types.Filter
+			err    error
+		)
+		filter, filterStr, err = inv.createFilter(ctx, d)
+		if err != nil {
+			return fmt.Errorf("failed updating invite: %w", err)
 		}
 		stmt = fmt.Sprintf(`UPDATE invites SET expires = ? WHERE %s`, filter.Where)
 		args = append(args, inv.Expires)
@@ -147,31 +132,9 @@ func (inv *Invite) Load(ctx context.Context, d types.Querier) error {
 // matches exactly one record. It returns an error if the invite doesn't exist,
 // or if more than one record would be deleted.
 func (inv *Invite) Delete(ctx context.Context, d types.Querier) error {
-	if inv.ID == 0 && inv.UUID == "" {
-		return fmt.Errorf("failed deleting invite: either invite ID or UUID must be set")
-	}
-
-	var filter *types.Filter
-	var filterStr string
-	if inv.ID != 0 {
-		filter = &types.Filter{Where: "id = ?", Args: []any{inv.ID}}
-		filterStr = fmt.Sprintf("ID %d", inv.ID)
-	} else if inv.UUID != "" {
-		if !cuid2.IsCuid(inv.UUID) {
-			return fmt.Errorf("invalid invite UUID: '%s'", inv.UUID)
-		}
-		if len(inv.UUID) < 12 {
-			filter = &types.Filter{Where: "uuid LIKE ?", Args: []any{fmt.Sprintf("%s%%", inv.UUID)}}
-			filterStr = fmt.Sprintf("UUID '%s*'", inv.UUID)
-			if count, err := filterCount(ctx, d, "invites", filter); err != nil {
-				return err
-			} else if count > 1 {
-				return fmt.Errorf("invite filter %s would delete %d invites; make the filter more specific", filterStr, count)
-			}
-		} else {
-			filter = &types.Filter{Where: "uuid = ?", Args: []any{inv.UUID}}
-			filterStr = fmt.Sprintf("UUID '%s'", inv.UUID)
-		}
+	filter, filterStr, err := inv.createFilter(ctx, d)
+	if err != nil {
+		return fmt.Errorf("failed deleting invite: %w", err)
 	}
 
 	stmt := fmt.Sprintf(`DELETE FROM invites WHERE %s`, filter.Where)
@@ -187,6 +150,35 @@ func (inv *Invite) Delete(ctx context.Context, d types.Querier) error {
 	}
 
 	return nil
+}
+
+func (inv *Invite) createFilter(ctx context.Context, d types.Querier) (*types.Filter, string, error) {
+	var filter *types.Filter
+	var filterStr string
+	if inv.ID != 0 {
+		filter = &types.Filter{Where: "id = ?", Args: []any{inv.ID}}
+		filterStr = fmt.Sprintf("ID %d", inv.ID)
+	} else if inv.UUID != "" {
+		if !cuid2.IsCuid(inv.UUID) {
+			return nil, "", fmt.Errorf("invalid invite UUID: '%s'", inv.UUID)
+		}
+		if len(inv.UUID) < 12 {
+			filter = &types.Filter{Where: "uuid LIKE ?", Args: []any{fmt.Sprintf("%s%%", inv.UUID)}}
+			filterStr = fmt.Sprintf("UUID '%s*'", inv.UUID)
+			if count, err := filterCount(ctx, d, "invites", filter); err != nil {
+				return nil, "", err
+			} else if count > 1 {
+				return nil, "", fmt.Errorf("filter %s would affect %d invites; make the filter more specific", filterStr, count)
+			}
+		} else {
+			filter = &types.Filter{Where: "uuid = ?", Args: []any{inv.UUID}}
+			filterStr = fmt.Sprintf("UUID '%s'", inv.UUID)
+		}
+	} else {
+		return nil, "", errors.New("must provide either an invite ID or UUID")
+	}
+
+	return filter, filterStr, nil
 }
 
 // Invites returns one or more invites from the database. An optional filter can

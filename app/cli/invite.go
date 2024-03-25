@@ -24,8 +24,8 @@ type Invite struct {
 		All bool `help:"Also include expired invites."`
 	} `kong:"cmd,help='List invites.'"`
 	Rm struct {
-		UUID string `arg:"" help:"The unique invite ID. A short prefix can be specified as long as it's unique."`
-	} `kong:"cmd,help='Delete an unredeemed invite.'"`
+		UUID []string `arg:"" help:"Unique invite IDs. A short prefix can be specified as long as it's unique."`
+	} `kong:"cmd,help='Delete one or more invites.'"`
 	Update struct {
 		UUID string         `arg:"" help:"The unique invite ID."`
 		TTL  *time.Duration `help:"Time duration the invite is valid for."`
@@ -104,9 +104,12 @@ Expires: %s
 		}
 
 	case "rm":
-		inv := &models.Invite{UUID: c.Rm.UUID}
-		if err := inv.Delete(dbCtx, appCtx.DB); err != nil {
-			return err
+		// TODO: Add a bulk deletion method?
+		for _, invUUID := range c.Rm.UUID {
+			inv := &models.Invite{UUID: invUUID}
+			if err := inv.Delete(dbCtx, appCtx.DB); err != nil {
+				return err
+			}
 		}
 
 	case "update":

@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/nrednav/cuid2"
+
 	"go.hackfix.me/disco/app/cli"
 	actx "go.hackfix.me/disco/app/context"
 	aerrors "go.hackfix.me/disco/app/errors"
@@ -42,7 +44,7 @@ func New(dataDir string, opts ...Option) *App {
 		opt(app)
 	}
 
-	uuidgen, err := actx.NewUUIDGenerator(12)
+	uuidgen, err := cuid2.Init(cuid2.WithLength(12))
 	if err != nil {
 		app.FatalIfErrorf(aerrors.NewRuntimeError(
 			"failed creating UUID generation function", err, ""))

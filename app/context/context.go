@@ -27,6 +27,7 @@ type Context struct {
 	Version     string // The static app version in the binary
 	VersionInit string // The app version the DB was initialized with
 	FS          vfs.FileSystem
+	DataDir     string
 	Env         Environment
 	Logger      *slog.Logger
 	UUIDGen     func() string

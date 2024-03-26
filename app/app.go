@@ -2,11 +2,19 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"path/filepath"
+	"slices"
 
 	"go.hackfix.me/disco/app/cli"
 	actx "go.hackfix.me/disco/app/context"
 	aerrors "go.hackfix.me/disco/app/errors"
+	"go.hackfix.me/disco/db"
+	"go.hackfix.me/disco/db/models"
+	"go.hackfix.me/disco/db/queries"
+	"go.hackfix.me/disco/db/store"
+	"go.hackfix.me/disco/db/store/sqlite"
 )
 
 // App is the application.
@@ -18,8 +26,11 @@ type App struct {
 	Exit func(int)
 }
 
-// New initializes a new application.
-func New(opts ...Option) *App {
+// New initializes a new application with the given options. dataDir specifies
+// the directory where application data will be stored, though this can be
+// overriden with the DISCO_DATA_DIR environment variable, and --data-dir CLI
+// flag.
+func New(dataDir string, opts ...Option) *App {
 	defaultCtx := &actx.Context{
 		Ctx:     context.Background(),
 		Logger:  slog.Default(),
@@ -40,17 +51,25 @@ func New(opts ...Option) *App {
 
 	slog.SetDefault(app.ctx.Logger)
 
-	cli := &cli.CLI{}
-	err = cli.Setup(app.ctx, app.args, app.Exit)
+	app.cli, err = cli.New(app.ctx, app.args, app.Exit, dataDir)
 	app.FatalIfErrorf(err)
-	app.cli = cli
 
 	return app
 }
 
-// Run starts execution of the application.
+// Run initializes the application environment and starts execution of the
+// application.
 func (app *App) Run() {
-	err := app.cli.Ctx.Run(app.ctx)
+	app.createDataDir(app.cli.DataDir)
+	storeDir := app.cli.DataDir
+	if app.ctx.FS.Name() == "MemoryFileSystem" {
+		// The SQLite lib will attempt to write directly with the os interface,
+		// so prevent it by using SQLite's in-memory support.
+		storeDir = ":memory:"
+	}
+	app.initStores(storeDir)
+
+	err := app.cli.Execute(app.ctx)
 	app.FatalIfErrorf(err)
 }
 
@@ -73,4 +92,76 @@ func (app *App) FatalIfErrorf(err error, args ...any) {
 		app.ctx.Logger.Error(msg, args...)
 		app.Exit(1)
 	}
+}
+
+func (app *App) createDataDir(dir string) {
+	err := app.ctx.FS.MkdirAll(dir, 0o700)
+	if err != nil {
+		app.FatalIfErrorf(aerrors.NewRuntimeError(
+			fmt.Sprintf("failed creating app data directory '%s'", dir), err, ""))
+	}
+}
+
+func (app *App) initStores(dataDir string) {
+	var err error
+	app.ctx.DB, err = initDB(app.ctx.Ctx, dataDir)
+	app.FatalIfErrorf(err)
+
+	version, err := queries.Version(app.ctx.DB.NewContext(), app.ctx.DB)
+	if version.Valid {
+		app.ctx.VersionInit = version.V
+	}
+
+	// Only load the local user if it's not set and we're currrently not
+	// initializing. If we're initializing, the migrations haven't been run at
+	// this point, so the schema doesn't exist yet.
+	cmd := app.cli.Command()
+	if app.ctx.User == nil && cmd != "init" {
+		// The encryption key is only required for specific commands.
+		encKeyCommands := []string{"get", "set", "serve", "invite user"}
+		readEncKey := slices.Contains(encKeyCommands, cmd)
+		err := app.ctx.LoadLocalUser(readEncKey)
+		app.FatalIfErrorf(err)
+	}
+
+	app.ctx.Store, err = initKVStore(app.ctx.Ctx, dataDir, app.ctx.User)
+	app.FatalIfErrorf(err)
+}
+
+func initDB(ctx context.Context, dataDir string) (*db.DB, error) {
+	dbPath := dataDir
+	if dbPath != ":memory:" {
+		dbPath = filepath.Join(dataDir, "disco.db")
+	}
+	d, err := db.Open(ctx, dbPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Enable foreign key enforcement
+	_, err = d.Exec(`PRAGMA foreign_keys = ON;`)
+	if err != nil {
+		return nil, err
+	}
+
+	return d, nil
+}
+
+func initKVStore(ctx context.Context, dataDir string, localUser *models.User) (store.Store, error) {
+	storePath := dataDir
+	if storePath != ":memory:" {
+		storePath = filepath.Join(dataDir, "store.db")
+	}
+
+	storeOpts := []sqlite.Option{}
+	if localUser != nil {
+		storeOpts = append(storeOpts, sqlite.WithEncryptionKey(localUser.PrivateKey))
+	}
+
+	store, err := sqlite.Open(ctx, storePath, storeOpts...)
+	if err != nil {
+		return nil, err
+	}
+
+	return store, nil
 }

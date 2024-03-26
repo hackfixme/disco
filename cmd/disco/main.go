@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -15,32 +14,22 @@ import (
 )
 
 func main() {
-	fs := osfs.New()
-	dataDir := filepath.Join(xdg.DataHome, "disco")
-	err := fs.MkdirAll(dataDir, 0o700)
-	if err != nil {
-		panic(fmt.Sprintf("failed creating app directory '%s': %s", dataDir, err))
-	}
-
 	// NOTE: The order of the passed options is significant, as some options depend
 	// on the values set by previous ones.
-	app.New(
-		app.WithExit(os.Exit),
-		app.WithArgs(os.Args[1:]),
-		app.WithEnv(osEnv{}),
+	app.New(filepath.Join(xdg.DataHome, "disco"),
 		app.WithFDs(
 			os.Stdin,
 			colorable.NewColorable(os.Stdout),
 			colorable.NewColorable(os.Stderr),
 		),
-		app.WithFS(fs),
+		app.WithFS(osfs.New()),
 		app.WithLogger(
 			isatty.IsTerminal(os.Stdout.Fd()),
 			isatty.IsTerminal(os.Stderr.Fd()),
 		),
-		app.WithDB(dataDir),
-		app.WithLocalUser(nil),
-		app.WithStore(dataDir),
+		app.WithExit(os.Exit),
+		app.WithArgs(os.Args[1:]),
+		app.WithEnv(osEnv{}),
 	).Run()
 }
 

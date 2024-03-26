@@ -1,20 +1,14 @@
 package app
 
 import (
-	"context"
 	"io"
 	"log/slog"
-	"path/filepath"
-	"slices"
 
 	"github.com/lmittmann/tint"
 	"github.com/mandelsoft/vfs/pkg/vfs"
 
 	actx "go.hackfix.me/disco/app/context"
-	"go.hackfix.me/disco/db"
 	"go.hackfix.me/disco/db/models"
-	"go.hackfix.me/disco/db/queries"
-	"go.hackfix.me/disco/db/store/sqlite"
 )
 
 // Option is a function that allows configuring the application.
@@ -24,29 +18,6 @@ type Option func(*App)
 func WithArgs(args []string) Option {
 	return func(app *App) {
 		app.args = args
-	}
-}
-
-// WithDB initializes the database used by the application.
-func WithDB(dataDir string) Option {
-	return func(app *App) {
-		dbCtx, _ := context.WithCancel(app.ctx.Ctx)
-		dbPath := dataDir
-		if dbPath != ":memory:" {
-			dbPath = filepath.Join(dataDir, "disco.db")
-		}
-		var err error
-		app.ctx.DB, err = db.Open(dbCtx, dbPath)
-		app.FatalIfErrorf(err)
-
-		// Enable foreign key enforcement
-		_, err = app.ctx.DB.Exec(`PRAGMA foreign_keys = ON;`)
-		app.FatalIfErrorf(err)
-
-		version, err := queries.Version(app.ctx.DB.NewContext(), app.ctx.DB)
-		if version.Valid {
-			app.ctx.VersionInit = version.V
-		}
 	}
 }
 
@@ -80,23 +51,10 @@ func WithFS(fs vfs.FileSystem) Option {
 	}
 }
 
-// WithLocalUser sets or loads the local user of the app.
+// WithLocalUser sets the local user of the app.
 func WithLocalUser(user *models.User) Option {
 	return func(app *App) {
-		if user != nil {
-			app.ctx.User = user
-			return
-		}
-
-		// Only load the local user if we're currrently not initializing.
-		if len(app.args) > 0 && app.args[0] != "init" {
-			// The encryption key is only required for specific commands.
-			readEncKey := (app.args[0] == "get" ||
-				app.args[0] == "set" || app.args[0] == "serve" ||
-				(len(app.args) > 1 && slices.Equal(app.args[0:2], []string{"invite", "user"})))
-			err := app.ctx.LoadLocalUser(readEncKey)
-			app.FatalIfErrorf(err)
-		}
+		app.ctx.User = user
 	}
 }
 
@@ -112,28 +70,6 @@ func WithLogger(isStdoutTTY, isStderrTTY bool) Option {
 		)
 		app.ctx.Logger = logger
 		slog.SetDefault(logger)
-	}
-}
-
-// WithStore initializes the key-value store used by the application.
-func WithStore(dataDir string) Option {
-	return func(app *App) {
-		storeCtx, _ := context.WithCancel(app.ctx.Ctx)
-		storePath := dataDir
-		if storePath != ":memory:" {
-			storePath = filepath.Join(dataDir, "store.db")
-		}
-
-		storeOpts := []sqlite.Option{}
-		if app.ctx.User != nil {
-			storeOpts = append(storeOpts, sqlite.WithEncryptionKey(app.ctx.User.PrivateKey))
-		}
-
-		var err error
-		app.ctx.Store, err = sqlite.Open(storeCtx, storePath, storeOpts...)
-		if err != nil {
-			app.FatalIfErrorf(err)
-		}
 	}
 }
 

@@ -2,7 +2,7 @@ package cli
 
 import (
 	actx "go.hackfix.me/disco/app/context"
-	"go.hackfix.me/disco/web"
+	"go.hackfix.me/disco/web/server"
 )
 
 // Serve starts the web server.
@@ -12,7 +12,7 @@ type Serve struct {
 
 // Run the serve command.
 func (s *Serve) Run(appCtx *actx.Context) error {
-	srv := web.NewServer(appCtx, s.Address)
+	srv := server.New(appCtx, s.Address)
 	// TODO: Handle graceful shutdown.
 	// See https://dev.to/mokiat/proper-http-shutdown-in-go-3fji
 	return srv.ListenAndServe()

@@ -1,4 +1,4 @@
-package web
+package server
 
 import (
 	"net"
@@ -9,7 +9,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	actx "go.hackfix.me/disco/app/context"
-	"go.hackfix.me/disco/web/api"
+	apiv1 "go.hackfix.me/disco/web/server/api/v1"
 )
 
 // Server is a wrapper around http.Server with some custom behavior.
@@ -18,8 +18,8 @@ type Server struct {
 	appCtx *actx.Context
 }
 
-// NewServer returns a new Server instance.
-func NewServer(appCtx *actx.Context, addr string) *Server {
+// New returns a new Server instance.
+func New(appCtx *actx.Context, addr string) *Server {
 	return &Server{
 		appCtx: appCtx,
 		Server: &http.Server{
@@ -55,7 +55,7 @@ func setupRouter(appCtx *actx.Context) chi.Router {
 	r.Use(middleware.Heartbeat("/ping"))
 	r.Use(middleware.Recoverer)
 
-	r.Mount("/api", api.Router(appCtx))
+	r.Mount("/api/v1", apiv1.Router(appCtx))
 
 	return r
 }

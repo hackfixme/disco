@@ -8,7 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 
-	"go.hackfix.me/disco/web/lib"
+	"go.hackfix.me/disco/web/server/lib"
 )
 
 type StoreGetRequest struct {

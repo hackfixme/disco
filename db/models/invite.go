@@ -203,8 +203,12 @@ func (inv *Invite) createFilter(ctx context.Context, d types.Querier, limit int)
 			filter = types.NewFilter("uuid = ?", []any{inv.UUID})
 			filterStr = fmt.Sprintf("UUID '%s'", inv.UUID)
 		}
+	} else if inv.Token != "" {
+		filter = types.NewFilter("token = ?", []any{inv.Token}).
+			And(types.NewFilter("expires > ?", []any{time.Now().UTC()}))
+		filterStr = fmt.Sprintf("token '%s'", inv.Token)
 	} else {
-		return nil, "", errors.New("must provide either an invite ID or UUID")
+		return nil, "", errors.New("must provide either an invite ID, UUID or token")
 	}
 
 	if count, err := filterCount(ctx, d, "invites", filter); err != nil {

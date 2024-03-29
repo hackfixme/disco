@@ -118,12 +118,24 @@ func (inv *Invite) Save(ctx context.Context, d types.Querier, update bool) error
 	return err
 }
 
-// Load the invite record from the database. The invite ID must be set for the
-// lookup.
+// Load the invite record from the database. The invite ID, UUID or token must
+// be set for the lookup.
 func (inv *Invite) Load(ctx context.Context, d types.Querier) error {
-	if inv.ID == 0 {
-		return fmt.Errorf("failed loading invite: the invite ID must be set")
+	filter, filterStr, err := inv.createFilter(ctx, d, 1)
+	if err != nil {
+		return fmt.Errorf("failed loading invite: %w", err)
 	}
+
+	invites, err := Invites(ctx, d, filter)
+	if err != nil {
+		return err
+	}
+
+	if len(invites) == 0 {
+		return types.ErrNoResult{Msg: fmt.Sprintf("invite with %s doesn't exist", filterStr)}
+	}
+
+	*inv = *invites[0]
 
 	return nil
 }

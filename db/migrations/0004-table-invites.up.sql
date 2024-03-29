@@ -4,7 +4,8 @@ CREATE TABLE invites (
   created_at   TIMESTAMP     NOT NULL,
   expires      TIMESTAMP     NOT NULL,
   user_id      INTEGER       NOT NULL,
-  token        VARCHAR(128)  NOT NULL,
+  token        VARCHAR(32)   NOT NULL,
+  public_key   VARCHAR(32)   NOT NULL,
   privkey_enc  BLOB          NOT NULL,
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );

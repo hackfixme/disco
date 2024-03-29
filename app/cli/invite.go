@@ -53,14 +53,17 @@ func (c *Invite) Run(kctx *kong.Context, appCtx *actx.Context) error {
 			return aerrors.NewRuntimeError(
 				"failed saving invite to the database", err, "")
 		}
-
+		token, err := inv.TokenComposite()
+		if err != nil {
+			return aerrors.NewRuntimeError("failed generating composite invitation token", err, "")
+		}
 		timeLeft := inv.Expires.Sub(time.Now().UTC())
 		expFmt := fmt.Sprintf("%s (%s)",
 			inv.Expires.Local().Format(time.DateTime),
 			timeLeft.Round(time.Second))
 		fmt.Fprintf(appCtx.Stdout, `Token: %s
 Expires: %s
-	`, inv.Token, expFmt)
+	`, token, expFmt)
 
 	case "ls":
 		now := time.Now().UTC()
@@ -77,15 +80,20 @@ Expires: %s
 		for _, inv := range invites {
 			timeLeft := inv.Expires.Sub(now)
 
+			token, err := inv.TokenComposite()
+			if err != nil {
+				return aerrors.NewRuntimeError("failed generating composite invitation token", err, "")
+			}
+
 			if timeLeft > 0 {
 				expFmt := fmt.Sprintf("%s (%s)",
 					inv.Expires.Local().Format(time.DateTime),
 					timeLeft.Round(time.Second))
-				active = append(active, []string{inv.UUID, inv.User.Name, inv.Token, expFmt})
+				active = append(active, []string{inv.UUID, inv.User.Name, token, expFmt})
 			} else {
 				expFmt := fmt.Sprintf("%s (expired)",
 					inv.Expires.Local().Format(time.DateTime))
-				expired = append(expired, []string{inv.UUID, inv.User.Name, inv.Token, expFmt})
+				expired = append(expired, []string{inv.UUID, inv.User.Name, token, expFmt})
 			}
 		}
 

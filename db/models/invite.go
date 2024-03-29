@@ -24,6 +24,7 @@ type Invite struct {
 	Expires   time.Time
 	User      *User
 	Token     string
+	PublicKey string
 
 	// Encrypted X25519 private key
 	privKeyEnc []byte
@@ -57,14 +58,14 @@ func NewInvite(user *User, ttl time.Duration, uuidgen func() string, encryptionK
 
 	createdAt := time.Now().UTC()
 	expires := createdAt.Add(ttl)
-	token := base58.Encode(slices.Concat(b, privKey.PublicKey().Bytes()))
 
 	return &Invite{
 		UUID:       uuidgen(),
 		CreatedAt:  createdAt,
 		Expires:    expires,
 		User:       user,
-		Token:      token,
+		Token:      base58.Encode(b),
+		PublicKey:  base58.Encode(privKey.PublicKey().Bytes()),
 		privKeyEnc: privKeyEncData,
 	}, nil
 }
@@ -95,9 +96,9 @@ func (inv *Invite) Save(ctx context.Context, d types.Querier, update bool) error
 		op = fmt.Sprintf("updating invite with %s", filterStr)
 	} else {
 		stmt = `INSERT INTO invites (
-				id, uuid, created_at, expires, user_id, token, privkey_enc)
-				VALUES (NULL, ?, ?, ?, ?, ?, ?)`
-		args = append(args, inv.UUID, inv.CreatedAt, inv.Expires, inv.User.ID, inv.Token, inv.privKeyEnc)
+				id, uuid, created_at, expires, user_id, token, public_key, privkey_enc)
+				VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)`
+		args = append(args, inv.UUID, inv.CreatedAt, inv.Expires, inv.User.ID, inv.Token, inv.PublicKey, inv.privKeyEnc)
 		op = "saving new invite"
 	}
 
@@ -152,6 +153,39 @@ func (inv *Invite) Delete(ctx context.Context, d types.Querier) error {
 	return nil
 }
 
+// TokenComposite generates the final token by concatenating the random token
+// with the X25519 public key.
+func (inv *Invite) TokenComposite() (string, error) {
+	tokenDec, err := base58.Decode(inv.Token)
+	if err != nil {
+		return "", err
+	}
+	pubKeyDec, err := base58.Decode(inv.PublicKey)
+	if err != nil {
+		return "", err
+	}
+
+	return base58.Encode(slices.Concat(tokenDec, pubKeyDec)), nil
+}
+
+// PrivateKey returns the decrypted X25519 private key.
+func (inv *Invite) PrivateKey(encryptionKey *[32]byte) (*ecdh.PrivateKey, error) {
+	privKeyDataR, err := crypto.DecryptSym(bytes.NewReader(inv.privKeyEnc), encryptionKey)
+	if err != nil {
+		return nil, err
+	}
+	privKeyData, err := io.ReadAll(privKeyDataR)
+	if err != nil {
+		return nil, err
+	}
+	privKey, err := ecdh.X25519().NewPrivateKey(privKeyData)
+	if err != nil {
+		return nil, err
+	}
+
+	return privKey, nil
+}
+
 func (inv *Invite) createFilter(ctx context.Context, d types.Querier) (*types.Filter, string, error) {
 	var filter *types.Filter
 	var filterStr string
@@ -184,7 +218,7 @@ func (inv *Invite) createFilter(ctx context.Context, d types.Querier) (*types.Fi
 // Invites returns one or more invites from the database. An optional filter can
 // be passed to limit the results.
 func Invites(ctx context.Context, d types.Querier, filter *types.Filter) ([]*Invite, error) {
-	query := `SELECT inv.id, inv.uuid, inv.created_at, inv.expires, inv.user_id, inv.token, inv.privkey_enc
+	queryFmt := `SELECT inv.id, inv.uuid, inv.created_at, inv.expires, inv.user_id, inv.token, inv.public_key, inv.privkey_enc
 		FROM invites inv
 		%s ORDER BY inv.expires ASC`
 
@@ -207,7 +241,7 @@ func Invites(ctx context.Context, d types.Querier, filter *types.Filter) ([]*Inv
 	for rows.Next() {
 		inv := Invite{}
 		var userID uint64
-		err := rows.Scan(&inv.ID, &inv.UUID, &inv.CreatedAt, &inv.Expires, &userID, &inv.Token, &inv.privKeyEnc)
+		err := rows.Scan(&inv.ID, &inv.UUID, &inv.CreatedAt, &inv.Expires, &userID, &inv.Token, &inv.PublicKey, &inv.privKeyEnc)
 		if err != nil {
 			return nil, fmt.Errorf("failed scanning invite data: %w", err)
 		}

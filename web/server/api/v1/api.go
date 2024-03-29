@@ -27,5 +27,7 @@ func Router(appCtx *actx.Context) chi.Router {
 	r.Get("/store/keys/*", h.StoreKeys)
 	r.Get("/store/keys", h.StoreKeys)
 
+	r.Post("/join", h.RemoteJoin)
+
 	return r
 }

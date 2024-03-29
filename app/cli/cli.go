@@ -21,6 +21,7 @@ type CLI struct {
 	Serve  Serve  `kong:"cmd,help='Start the web server.'"`
 	User   User   `kong:"cmd,help='Manage users.'"`
 	Invite Invite `kong:"cmd,help='Manage invitations for remote users.'"`
+	Remote Remote `kong:"cmd,help='Manage remote Disco nodes.'"`
 
 	DataDir       string `kong:"default='${dataDir}',help='Directory to store Disco data in.'"`
 	EncryptionKey string `kong:"help='32-byte private key used for encrypting and decrypting the local data store, encoded in base 58. '"`

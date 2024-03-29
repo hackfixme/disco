@@ -12,7 +12,10 @@ type Serve struct {
 
 // Run the serve command.
 func (s *Serve) Run(appCtx *actx.Context) error {
-	srv := server.New(appCtx, s.Address)
+	srv, err := server.New(appCtx, s.Address)
+	if err != nil {
+		return err
+	}
 	// TODO: Handle graceful shutdown.
 	// See https://dev.to/mokiat/proper-http-shutdown-in-go-3fji
 	return srv.ListenAndServe()

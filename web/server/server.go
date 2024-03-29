@@ -1,6 +1,8 @@
 package server
 
 import (
+	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"time"
@@ -9,19 +11,35 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	actx "go.hackfix.me/disco/app/context"
+	"go.hackfix.me/disco/crypto"
 	apiv1 "go.hackfix.me/disco/web/server/api/v1"
 )
 
 // Server is a wrapper around http.Server with some custom behavior.
 type Server struct {
 	*http.Server
-	appCtx *actx.Context
+	appCtx    *actx.Context
+	tlsConfig *tls.Config
 }
 
-// New returns a new Server instance.
-func New(appCtx *actx.Context, addr string) *Server {
-	return &Server{
-		appCtx: appCtx,
+// New returns a new web Server instance. It creates a self-signed certificate
+// for TLS connections over which store data will be transferred.
+func New(appCtx *actx.Context, addr string) (*Server, error) {
+	cert, pkey, err := crypto.NewTLSCert(
+		[]string{"localhost"}, time.Now().Add(24*time.Hour), appCtx.User.PrivateKey,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed generating a new TLS certificate: %w", err)
+	}
+
+	tlsCfg := crypto.DefaultTLSConfig()
+	certPair, err := tls.X509KeyPair([]byte(cert), []byte(pkey))
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing PEM encoded TLS certificate: %w", err)
+	}
+	tlsCfg.Certificates = []tls.Certificate{certPair}
+
+	srv := &Server{
 		Server: &http.Server{
 			Handler:           setupRouter(appCtx),
 			Addr:              addr,
@@ -29,7 +47,11 @@ func New(appCtx *actx.Context, addr string) *Server {
 			ReadTimeout:       30 * time.Second,
 			WriteTimeout:      10 * time.Minute,
 		},
+		appCtx:    appCtx,
+		tlsConfig: tlsCfg,
 	}
+
+	return srv, nil
 }
 
 // ListenAndServe is a replacement of http.ListenAndServe to ensure we set the

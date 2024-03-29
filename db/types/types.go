@@ -19,6 +19,7 @@ type Querier interface {
 type Filter struct {
 	Where string
 	Args  []any
+	Limit int
 }
 
 func NewFilter(where string, args []any) *Filter {

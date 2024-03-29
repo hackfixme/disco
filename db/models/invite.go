@@ -86,7 +86,7 @@ func (inv *Invite) Save(ctx context.Context, d types.Querier, update bool) error
 			filter *types.Filter
 			err    error
 		)
-		filter, filterStr, err = inv.createFilter(ctx, d)
+		filter, filterStr, err = inv.createFilter(ctx, d, 1)
 		if err != nil {
 			return fmt.Errorf("failed updating invite: %w", err)
 		}
@@ -133,7 +133,7 @@ func (inv *Invite) Load(ctx context.Context, d types.Querier) error {
 // matches exactly one record. It returns an error if the invite doesn't exist,
 // or if more than one record would be deleted.
 func (inv *Invite) Delete(ctx context.Context, d types.Querier) error {
-	filter, filterStr, err := inv.createFilter(ctx, d)
+	filter, filterStr, err := inv.createFilter(ctx, d, 1)
 	if err != nil {
 		return fmt.Errorf("failed deleting invite: %w", err)
 	}
@@ -186,31 +186,34 @@ func (inv *Invite) PrivateKey(encryptionKey *[32]byte) (*ecdh.PrivateKey, error)
 	return privKey, nil
 }
 
-func (inv *Invite) createFilter(ctx context.Context, d types.Querier) (*types.Filter, string, error) {
+func (inv *Invite) createFilter(ctx context.Context, d types.Querier, limit int) (*types.Filter, string, error) {
 	var filter *types.Filter
 	var filterStr string
 	if inv.ID != 0 {
-		filter = &types.Filter{Where: "id = ?", Args: []any{inv.ID}}
+		filter = types.NewFilter("id = ?", []any{inv.ID})
 		filterStr = fmt.Sprintf("ID %d", inv.ID)
 	} else if inv.UUID != "" {
 		if !cuid2.IsCuid(inv.UUID) {
 			return nil, "", fmt.Errorf("invalid invite UUID: '%s'", inv.UUID)
 		}
 		if len(inv.UUID) < 12 {
-			filter = &types.Filter{Where: "uuid LIKE ?", Args: []any{fmt.Sprintf("%s%%", inv.UUID)}}
+			filter = types.NewFilter("uuid LIKE ?", []any{fmt.Sprintf("%s%%", inv.UUID)})
 			filterStr = fmt.Sprintf("UUID '%s*'", inv.UUID)
-			if count, err := filterCount(ctx, d, "invites", filter); err != nil {
-				return nil, "", err
-			} else if count > 1 {
-				return nil, "", fmt.Errorf("filter %s would affect %d invites; make the filter more specific", filterStr, count)
-			}
 		} else {
-			filter = &types.Filter{Where: "uuid = ?", Args: []any{inv.UUID}}
+			filter = types.NewFilter("uuid = ?", []any{inv.UUID})
 			filterStr = fmt.Sprintf("UUID '%s'", inv.UUID)
 		}
 	} else {
 		return nil, "", errors.New("must provide either an invite ID or UUID")
 	}
+
+	if count, err := filterCount(ctx, d, "invites", filter); err != nil {
+		return nil, "", err
+	} else if count > limit {
+		return nil, "", fmt.Errorf("filter %s returns %d results; make the filter more specific", filterStr, count)
+	}
+
+	filter.Limit = limit
 
 	return filter, filterStr, nil
 }
@@ -220,16 +223,20 @@ func (inv *Invite) createFilter(ctx context.Context, d types.Querier) (*types.Fi
 func Invites(ctx context.Context, d types.Querier, filter *types.Filter) ([]*Invite, error) {
 	queryFmt := `SELECT inv.id, inv.uuid, inv.created_at, inv.expires, inv.user_id, inv.token, inv.public_key, inv.privkey_enc
 		FROM invites inv
-		%s ORDER BY inv.expires ASC`
+		%s ORDER BY inv.expires ASC %s`
 
 	where := "1=1"
+	var limit string
 	args := []any{}
 	if filter != nil {
 		where = filter.Where
 		args = filter.Args
+		if filter.Limit > 0 {
+			limit = fmt.Sprintf("LIMIT %d", filter.Limit)
+		}
 	}
 
-	query = fmt.Sprintf(query, fmt.Sprintf("WHERE %s", where))
+	query := fmt.Sprintf(queryFmt, fmt.Sprintf("WHERE %s", where), limit)
 
 	rows, err := d.QueryContext(ctx, query, args...)
 	if err != nil {

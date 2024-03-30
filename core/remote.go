@@ -39,11 +39,11 @@ func RemoteAuth(ctx context.Context, address, token string) ([]byte, error) {
 	// remote node will generate a TLS client certificate, encrypt it with the
 	// shared key, and send it in the response.
 	c := client.New(address)
-	tlsClientCertEnc, err := c.Join(ctx, base58.Encode(tokenData), base58.Encode(pubKeyData))
+	joinResp, err := c.Join(ctx, base58.Encode(tokenData), base58.Encode(pubKeyData))
 	if err != nil {
 		return nil, err
 	}
-	tlsClientCertDec, err := base58.Decode(tlsClientCertEnc)
+	tlsClientCertDec, err := base58.Decode(joinResp.TLSClientCertEnc)
 	if err != nil {
 		return nil, fmt.Errorf("failed decoding TLS client certificate: %w", err)
 	}

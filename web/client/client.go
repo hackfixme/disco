@@ -37,8 +37,9 @@ func New(address string) *Client {
 // client's X25519 public key, and is sent in the request body.
 // If the token is valid and not expired, the server will generate a TLS client
 // certificate, encrypt it with the X25519 shared key, and send it in the
-// response body. This method returns the encrypted TLS client certificate.
-func (c *Client) Join(ctx context.Context, token, pubKey string) (tlsClientCertEnc string, err error) {
+// response body. This method returns the encrypted TLS client certificate and
+// client key, and the TLS CA certificate.
+func (c *Client) Join(ctx context.Context, token, pubKey string) (*types.RemoteJoinResponse, error) {
 	url := &url.URL{Scheme: "http", Host: c.address, Path: "/api/v1/join"}
 
 	reqCtx, cancelReqCtx := context.WithCancel(ctx)
@@ -47,27 +48,27 @@ func (c *Client) Join(ctx context.Context, token, pubKey string) (tlsClientCertE
 	req, err := http.NewRequestWithContext(
 		reqCtx, "POST", url.String(), bytes.NewBufferString(pubKey))
 	if err != nil {
-		return "", fmt.Errorf("failed creating request: %w", err)
+		return nil, fmt.Errorf("failed creating request: %w", err)
 	}
 
 	req.Header.Set("Authorization", token)
 
 	resp, err := c.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed sending request: %w", err)
+		return nil, fmt.Errorf("failed sending request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	joinRespBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed reading response body: %w", err)
+		return nil, fmt.Errorf("failed reading response body: %w", err)
 	}
 
-	joinResp := types.RemoteJoinResponse{}
-	err = json.Unmarshal(joinRespBody, &joinResp)
+	joinResp := &types.RemoteJoinResponse{}
+	err = json.Unmarshal(joinRespBody, joinResp)
 	if err != nil {
-		return "", fmt.Errorf("failed unmarshalling response body: %w", err)
+		return nil, fmt.Errorf("failed unmarshalling response body: %w", err)
 	}
 
-	return joinResp.TLSClientCertEnc, nil
+	return joinResp, nil
 }

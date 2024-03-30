@@ -40,6 +40,9 @@ type Context struct {
 	DB    *db.DB
 	Store store.Store
 	User  *models.User
+
+	// CA certificate of the TLS server, encoded in PEM format
+	TLSCACert []byte
 }
 
 // Environment is the interface to the process environment.

@@ -40,11 +40,15 @@ func DefaultTLSConfig() *tls.Config {
 	}
 }
 
-// NewTLSCert creates a self-signed X.509 v3 certificate and the Ed25519 private
-// key that signs it, using the provided Subject Alternate Names and expiration
-// time, and returns them as PEM encoded data.
+// NewTLSCert creates a X.509 v3 certificate using the provided subjectName,
+// Subject Alternative Names and expiration date. If parent is nil, the
+// certificate is self-signed using a new Ed25519 private key; otherwise the
+// parent certificate is used to sign the new certificate (e.g. for client certs).
+// It returns the certificate and private key encoded in PEM format.
 // Source: https://eli.thegreenplace.net/2021/go-https-servers-with-tls/
-func NewTLSCert(san []string, expiration time.Time, keySeed *[32]byte) (certPEM, privateKeyPEM []byte, err error) {
+func NewTLSCert(
+	subjectName string, san []string, expiration time.Time, parent *tls.Certificate,
+) (certPEM, privateKeyPEM []byte, err error) {
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
@@ -55,6 +59,7 @@ func NewTLSCert(san []string, expiration time.Time, keySeed *[32]byte) (certPEM,
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
 			Organization: []string{"HACKfixme"},
+			CommonName:   subjectName,
 		},
 		DNSNames:              san,
 		NotBefore:             time.Now(),
@@ -64,11 +69,35 @@ func NewTLSCert(san []string, expiration time.Time, keySeed *[32]byte) (certPEM,
 		BasicConstraintsValid: true,
 	}
 
-	privKey := ed25519.NewKeyFromSeed(keySeed[:])
-
-	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, privKey.Public(), privKey)
+	pubKey, privKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed creating X.509 certificate: %w", err)
+		return nil, nil, fmt.Errorf("failed generating Ed25519 key pair: %w", err)
+	}
+
+	var (
+		certDER []byte
+		certErr error
+	)
+	if parent != nil {
+		if len(parent.Certificate) == 0 {
+			return nil, nil, errors.New("no certificate data found in parent certificate")
+		}
+
+		x509Cert, err := x509.ParseCertificate(parent.Certificate[0])
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed parsing X.509 certificate from parent: %w", err)
+		}
+
+		// Client cert signed by the parent (CA) cert
+		certDER, certErr = x509.CreateCertificate(rand.Reader, &template,
+			x509Cert, pubKey, parent.PrivateKey)
+	} else {
+		// Self-signed cert used by the server (CA)
+		certDER, certErr = x509.CreateCertificate(rand.Reader, &template,
+			&template, pubKey, privKey)
+	}
+	if certErr != nil {
+		return nil, nil, fmt.Errorf("failed creating X.509 certificate: %w", certErr)
 	}
 
 	certPEM = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/render"
 	"github.com/mr-tron/base58"
@@ -61,15 +62,20 @@ func (h *Handler) RemoteJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	clientCert, clientKey, err := crypto.NewTLSCert(
+		inv.User.Name, []string{"localhost"}, time.Now().Add(24*time.Hour), nil,
+	)
+
 	var sharedKeyArr [32]byte
 	copy(sharedKeyArr[:], sharedKey)
-	// TODO: Generate TLS client certificate
-	tlsClientCertEncR, err := crypto.EncryptSym(bytes.NewBufferString("hello"), &sharedKeyArr)
+
+	tlsClientCertEnc, err := encrypt(clientCert, &sharedKeyArr)
 	if err != nil {
 		_ = render.Render(w, r, types.ErrInternal(err))
 		return
 	}
-	tlsClientCertEnc, err := io.ReadAll(tlsClientCertEncR)
+
+	tlsClientKeyEnc, err := encrypt(clientKey, &sharedKeyArr)
 	if err != nil {
 		_ = render.Render(w, r, types.ErrInternal(err))
 		return
@@ -77,6 +83,21 @@ func (h *Handler) RemoteJoin(w http.ResponseWriter, r *http.Request) {
 
 	_ = render.Render(w, r, &types.RemoteJoinResponse{
 		Response:         &types.Response{StatusCode: http.StatusOK},
+		TLSCACert:        string(h.appCtx.TLSCACert),
 		TLSClientCertEnc: base58.Encode(tlsClientCertEnc),
+		TLSClientKeyEnc:  base58.Encode(tlsClientKeyEnc),
 	})
+}
+
+func encrypt(data []byte, key *[32]byte) ([]byte, error) {
+	dataEncR, err := crypto.EncryptSym(bytes.NewBuffer(data), key)
+	if err != nil {
+		return nil, err
+	}
+	dataEnc, err := io.ReadAll(dataEncR)
+	if err != nil {
+		return nil, err
+	}
+
+	return dataEnc, nil
 }

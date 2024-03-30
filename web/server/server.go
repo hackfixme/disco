@@ -28,7 +28,7 @@ type Server struct {
 // for TLS connections over which store data will be transferred.
 func New(appCtx *actx.Context, addr string) (*Server, error) {
 	cert, pkey, err := crypto.NewTLSCert(
-		[]string{"localhost"}, time.Now().Add(24*time.Hour), appCtx.User.PrivateKey,
+		"disco server", []string{"localhost"}, time.Now().Add(24*time.Hour), nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed generating a new TLS certificate: %w", err)
@@ -40,6 +40,8 @@ func New(appCtx *actx.Context, addr string) (*Server, error) {
 		return nil, fmt.Errorf("failed parsing PEM encoded TLS certificate: %w", err)
 	}
 	tlsCfg.Certificates = []tls.Certificate{certPair}
+
+	appCtx.TLSCACert = cert
 
 	srv := &Server{
 		Server: &http.Server{

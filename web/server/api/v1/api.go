@@ -1,11 +1,14 @@
 package api
 
 import (
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 
 	actx "go.hackfix.me/disco/app/context"
+	"go.hackfix.me/disco/web/server/types"
 )
 
 // Handler is the API endpoint handler.
@@ -22,12 +25,30 @@ func Router(appCtx *actx.Context) chi.Router {
 	r.Use(middleware.RequestSize(100 << (10 * 2)))
 
 	h := Handler{appCtx}
-	r.Get("/store/value/*", h.StoreGet)
-	r.Post("/store/value/*", h.StoreSet)
-	r.Get("/store/keys/*", h.StoreKeys)
-	r.Get("/store/keys", h.StoreKeys)
+	r.Route("/store", func(r chi.Router) {
+		r.Use(tlsOnly)
+		r.Get("/value/*", h.StoreGet)
+		r.Post("/value/*", h.StoreSet)
+		r.Get("/keys/*", h.StoreKeys)
+		r.Get("/keys", h.StoreKeys)
+	})
 
 	r.Post("/join", h.RemoteJoin)
 
 	return r
+}
+
+// tlsOnly ensures that the resource is served exclusively over TLS. It returns
+// 401 Unauthorized otherwise.
+func tlsOnly(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		connType := r.Context().Value(types.ConnTypeKey)
+		ct, ok := connType.(types.ConnType)
+		if !ok || ct != types.ConnTypeTLS {
+			_ = render.Render(w, r, types.ErrUnauthorized())
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }

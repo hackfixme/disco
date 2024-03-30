@@ -11,14 +11,9 @@ import (
 
 	"go.hackfix.me/disco/crypto"
 	"go.hackfix.me/disco/db/models"
-	"go.hackfix.me/disco/db/types"
-	"go.hackfix.me/disco/web/server/lib"
+	dbtypes "go.hackfix.me/disco/db/types"
+	"go.hackfix.me/disco/web/server/types"
 )
-
-type RemoteJoinResponse struct {
-	*lib.Response
-	TLSClientCertEnc string `json:"tls_client_cert_enc"`
-}
 
 // RemoteJoin authenticates a remote Disco node.
 // The request is expected to contain an Authorization header with a random
@@ -32,37 +27,37 @@ func (h *Handler) RemoteJoin(w http.ResponseWriter, r *http.Request) {
 
 	inv := &models.Invite{Token: token}
 	if err := inv.Load(h.appCtx.DB.NewContext(), h.appCtx.DB); err != nil {
-		var errNoRes types.ErrNoResult
+		var errNoRes dbtypes.ErrNoResult
 		if errors.As(err, &errNoRes) {
-			_ = render.Render(w, r, lib.ErrUnauthorized())
+			_ = render.Render(w, r, types.ErrUnauthorized())
 			return
 		}
 
-		_ = render.Render(w, r, lib.ErrBadRequest(err))
+		_ = render.Render(w, r, types.ErrBadRequest(err))
 		return
 	}
 
 	clientPubKeyEnc, err := io.ReadAll(r.Body)
 	if err != nil {
-		_ = render.Render(w, r, lib.ErrBadRequest(err))
+		_ = render.Render(w, r, types.ErrBadRequest(err))
 		return
 	}
 
 	clientPubKeyData, err := base58.Decode(string(clientPubKeyEnc))
 	if err != nil {
-		_ = render.Render(w, r, lib.ErrBadRequest(err))
+		_ = render.Render(w, r, types.ErrBadRequest(err))
 		return
 	}
 
 	privKey, err := inv.PrivateKey(h.appCtx.User.PrivateKey)
 	if err != nil {
-		_ = render.Render(w, r, lib.ErrInternal(err))
+		_ = render.Render(w, r, types.ErrInternal(err))
 		return
 	}
 
 	sharedKey, _, err := crypto.ECDHExchange(clientPubKeyData, privKey.Bytes())
 	if err != nil {
-		_ = render.Render(w, r, lib.ErrInternal(err))
+		_ = render.Render(w, r, types.ErrInternal(err))
 		return
 	}
 
@@ -71,17 +66,17 @@ func (h *Handler) RemoteJoin(w http.ResponseWriter, r *http.Request) {
 	// TODO: Generate TLS client certificate
 	tlsClientCertEncR, err := crypto.EncryptSym(bytes.NewBufferString("hello"), &sharedKeyArr)
 	if err != nil {
-		_ = render.Render(w, r, lib.ErrInternal(err))
+		_ = render.Render(w, r, types.ErrInternal(err))
 		return
 	}
 	tlsClientCertEnc, err := io.ReadAll(tlsClientCertEncR)
 	if err != nil {
-		_ = render.Render(w, r, lib.ErrInternal(err))
+		_ = render.Render(w, r, types.ErrInternal(err))
 		return
 	}
 
-	_ = render.Render(w, r, &RemoteJoinResponse{
-		Response:         &lib.Response{StatusCode: http.StatusOK},
+	_ = render.Render(w, r, &types.RemoteJoinResponse{
+		Response:         &types.Response{StatusCode: http.StatusOK},
 		TLSClientCertEnc: base58.Encode(tlsClientCertEnc),
 	})
 }

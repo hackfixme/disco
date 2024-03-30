@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"time"
 
-	"go.hackfix.me/disco/web/server/api/v1"
+	"go.hackfix.me/disco/web/server/types"
 )
 
 type Client struct {
@@ -63,7 +63,7 @@ func (c *Client) Join(ctx context.Context, token, pubKey string) (tlsClientCertE
 		return "", fmt.Errorf("failed reading response body: %w", err)
 	}
 
-	joinResp := api.RemoteJoinResponse{}
+	joinResp := types.RemoteJoinResponse{}
 	err = json.Unmarshal(joinRespBody, &joinResp)
 	if err != nil {
 		return "", fmt.Errorf("failed unmarshalling response body: %w", err)

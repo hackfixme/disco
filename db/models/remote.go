@@ -115,10 +115,25 @@ func (r *Remote) Delete(ctx context.Context, d types.Querier) error {
 	return nil
 }
 
-// Remotes returns one or more remotes from the database. An optional filter can
-// be passed to limit the results.
-func Remotes(ctx context.Context, d types.Querier, filter *types.Filter) ([]*Remote, error) {
-	return nil, nil
+// ClientTLSCert returns the unencrypted TLS client certificate and private key
+// pair.
+func (r *Remote) ClientTLSCert(encKey *[32]byte) (*tls.Certificate, error) {
+	tlsClientCert, err := crypto.DecryptSymInMemory(r.tlsClientCertEnc, encKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed decrypting TLS client certificate: %w", err)
+	}
+
+	tlsClientKey, err := crypto.DecryptSymInMemory(r.tlsClientKeyEnc, encKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed decrypting TLS client private key: %w", err)
+	}
+
+	certPair, err := tls.X509KeyPair(tlsClientCert, tlsClientKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing PEM encoded TLS client certificate: %w", err)
+	}
+
+	return &certPair, nil
 }
 
 func (r *Remote) createFilter(ctx context.Context, d types.Querier, limit int) (*types.Filter, string, error) {

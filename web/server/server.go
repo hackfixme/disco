@@ -1,8 +1,8 @@
 package server
 
 import (
-	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"net"
 	"net/http"
 	"time"
@@ -13,7 +13,6 @@ import (
 	actx "go.hackfix.me/disco/app/context"
 	"go.hackfix.me/disco/crypto"
 	apiv1 "go.hackfix.me/disco/web/server/api/v1"
-	"go.hackfix.me/disco/web/server/types"
 )
 
 // Server is a wrapper around http.Server with some custom behavior.
@@ -27,11 +26,16 @@ type Server struct {
 // for TLS connections over which store data will be transferred.
 func New(appCtx *actx.Context, addr string) (*Server, error) {
 	tlsCfg := crypto.DefaultTLSConfig()
-	cert, err := appCtx.ServerTLSCert()
+	cert, certPEM, err := appCtx.ServerTLSCert()
 	if err != nil {
 		return nil, err
 	}
 	tlsCfg.Certificates = []tls.Certificate{*cert}
+	tlsCfg.ClientAuth = tls.RequireAndVerifyClientCert
+
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(certPEM)
+	tlsCfg.ClientCAs = caCertPool
 
 	srv := &Server{
 		Server: &http.Server{
@@ -40,19 +44,6 @@ func New(appCtx *actx.Context, addr string) (*Server, error) {
 			ReadHeaderTimeout: 10 * time.Second,
 			ReadTimeout:       30 * time.Second,
 			WriteTimeout:      10 * time.Minute,
-			// Context used in handlers to decide whether to serve the data over
-			// unencrypted HTTP or TLS.
-			ConnContext: func(ctx context.Context, c net.Conn) context.Context {
-				var ct types.ConnType
-				switch c.(type) {
-				case *tls.Conn:
-					ct = types.ConnTypeTLS
-				default:
-					ct = types.ConnTypeHTTP
-				}
-
-				return context.WithValue(ctx, types.ConnTypeKey, ct)
-			},
 		},
 		appCtx:    appCtx,
 		tlsConfig: tlsCfg,

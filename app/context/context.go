@@ -98,21 +98,21 @@ func (c *Context) LoadLocalUser(readEncKey bool) error {
 }
 
 // ServerTLSCert returns the TLS certificate and private key used by the server.
-func (c *Context) ServerTLSCert() (*tls.Certificate, error) {
-	cert, privKeyEnc, err := queries.GetServerTLSCert(c.DB.NewContext(), c.DB)
+func (c *Context) ServerTLSCert() (*tls.Certificate, []byte, error) {
+	certPEM, privKeyEnc, err := queries.GetServerTLSCert(c.DB.NewContext(), c.DB)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	privKey, err := crypto.DecryptSymInMemory(privKeyEnc.V, c.User.PrivateKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed decrypting server TLS private key: %w", err)
+		return nil, nil, fmt.Errorf("failed decrypting server TLS private key: %w", err)
 	}
 
-	certPair, err := tls.X509KeyPair([]byte(cert.V), privKey)
+	certPair, err := tls.X509KeyPair([]byte(certPEM.V), privKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed parsing PEM encoded TLS certificate: %w", err)
+		return nil, nil, fmt.Errorf("failed parsing PEM encoded TLS certificate: %w", err)
 	}
 
-	return &certPair, nil
+	return &certPair, []byte(certPEM.V), nil
 }

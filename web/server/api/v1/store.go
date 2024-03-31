@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 
+	"go.hackfix.me/disco/db/models"
 	"go.hackfix.me/disco/web/server/types"
 )
 
@@ -21,6 +22,11 @@ func (h *Handler) StoreGet(w http.ResponseWriter, r *http.Request) {
 
 	if ns := r.URL.Query().Get("namespace"); ns != "" {
 		req.Namespace = ns
+	}
+
+	if err := authzUser(r, models.ActionRead, models.ResourceStore, req.Namespace, req.Key); err != nil {
+		_ = render.Render(w, r, types.ErrUnauthorized(err.Error()))
+		return
 	}
 
 	ok, val, err := h.appCtx.Store.Get(req.Namespace, req.Key)
@@ -55,6 +61,11 @@ func (h *Handler) StoreSet(w http.ResponseWriter, r *http.Request) {
 		req.Namespace = ns
 	}
 
+	if err := authzUser(r, models.ActionWrite, models.ResourceStore, req.Namespace, req.Key); err != nil {
+		_ = render.Render(w, r, types.ErrUnauthorized(err.Error()))
+		return
+	}
+
 	err := h.appCtx.Store.Set(req.Namespace, req.Key, r.Body)
 	if err != nil {
 		_ = render.Render(w, r, types.ErrInternal(err))
@@ -71,6 +82,11 @@ func (h *Handler) StoreKeys(w http.ResponseWriter, r *http.Request) {
 	req := &types.StoreKeysRequest{Namespace: "default", Prefix: chi.URLParam(r, "*")}
 	if ns := r.URL.Query().Get("namespace"); ns != "" {
 		req.Namespace = ns
+	}
+
+	if err := authzUser(r, models.ActionRead, models.ResourceStore, req.Namespace, req.Prefix); err != nil {
+		_ = render.Render(w, r, types.ErrUnauthorized(err.Error()))
+		return
 	}
 
 	nsKeys, err := h.appCtx.Store.List(req.Namespace, req.Prefix)

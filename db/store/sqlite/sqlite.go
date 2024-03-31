@@ -190,10 +190,14 @@ func (s *Store) List(namespace, keyPrefix string) (map[string][]string, error) {
 		for rows.Next() {
 			var key string
 			err = rows.Scan(&key)
+			if err != nil {
+				return err
+			}
 			if nsKeys, ok := keysPerNS[ns]; !ok {
 				keysPerNS[ns] = []string{key}
 			} else {
 				nsKeys = append(nsKeys, key)
+				keysPerNS[ns] = nsKeys
 			}
 		}
 

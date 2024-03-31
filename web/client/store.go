@@ -104,3 +104,48 @@ func (c *Client) StoreSet(ctx context.Context, namespace, key string, value io.R
 
 	return nil
 }
+
+func (c *Client) StoreList(ctx context.Context, namespace, keyPrefix string) (map[string][]string, error) {
+	u := &url.URL{Scheme: "https", Host: c.address, Path: "/api/v1/store/keys"}
+
+	if namespace != "" {
+		q := u.Query()
+		q.Set("namespace", namespace)
+		qDec, err := url.QueryUnescape(q.Encode())
+		if err != nil {
+			return nil, fmt.Errorf("failed decoding query string: %w", err)
+		}
+		u.RawQuery = qDec
+	}
+
+	reqCtx, cancelReqCtx := context.WithCancel(ctx)
+	defer cancelReqCtx()
+
+	req, err := http.NewRequestWithContext(reqCtx, "GET", u.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating request: %w", err)
+	}
+
+	resp, err := c.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed sending request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	keysBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed reading response body: %w", err)
+	}
+
+	keysResp := &types.StoreKeysResponse{}
+	err = json.Unmarshal(keysBody, keysResp)
+	if err != nil {
+		return nil, fmt.Errorf("failed unmarshalling response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New(keysResp.Error)
+	}
+
+	return keysResp.Data, nil
+}

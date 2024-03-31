@@ -120,7 +120,7 @@ func (app *App) initStores(dataDir string) {
 	cmd := app.cli.Command()
 	if app.ctx.User == nil && cmd != "init" {
 		// The encryption key is only required for specific commands.
-		encKeyCommands := []string{"get", "set", "serve", "invite user", "remote add"}
+		encKeyCommands := []string{"get", "set", "ls", "serve", "invite user", "remote add"}
 		readEncKey := slices.Contains(encKeyCommands, cmd)
 		err := app.ctx.LoadLocalUser(readEncKey)
 		app.FatalIfErrorf(err)

@@ -55,17 +55,25 @@ func NewTLSCert(
 		return nil, nil, fmt.Errorf("failed generating serial number: %w", err)
 	}
 
+	var isCA bool
+	if parent == nil {
+		isCA = true
+	}
+
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
 			Organization: []string{"HACKfixme"},
 			CommonName:   subjectName,
 		},
-		DNSNames:              san,
-		NotBefore:             time.Now(),
-		NotAfter:              expiration,
-		KeyUsage:              x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		IsCA:      isCA,
+		DNSNames:  san,
+		NotBefore: time.Now(),
+		NotAfter:  expiration,
+		KeyUsage: x509.KeyUsageKeyEncipherment |
+			x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		ExtKeyUsage: []x509.ExtKeyUsage{
+			x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		BasicConstraintsValid: true,
 	}
 

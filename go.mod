@@ -16,7 +16,7 @@ require (
 	github.com/mr-tron/base58 v1.2.0
 	github.com/nrednav/cuid2 v1.0.0
 	github.com/olekukonko/tablewriter v0.0.5
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.9.0
 	github.com/zpatrick/rbac v0.0.0-20180829190353-d2c4f050cf28
 	golang.org/x/crypto v0.21.0
 )
@@ -36,7 +36,7 @@ require (
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
-	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	modernc.org/libc v1.37.6 // indirect
 	modernc.org/mathutil v1.6.0 // indirect
 	modernc.org/memory v1.7.2 // indirect

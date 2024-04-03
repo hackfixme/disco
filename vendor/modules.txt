@@ -44,6 +44,7 @@ github.com/lmittmann/tint
 github.com/mandelsoft/filepath/pkg/filepath
 # github.com/mandelsoft/vfs v0.4.3
 ## explicit; go 1.19
+github.com/mandelsoft/vfs/pkg/memoryfs
 github.com/mandelsoft/vfs/pkg/osfs
 github.com/mandelsoft/vfs/pkg/projectionfs
 github.com/mandelsoft/vfs/pkg/utils
@@ -75,8 +76,8 @@ github.com/remyoudompheng/bigfft
 # github.com/ryanuber/go-glob v1.0.0
 ## explicit
 github.com/ryanuber/go-glob
-# github.com/stretchr/testify v1.7.0
-## explicit; go 1.13
+# github.com/stretchr/testify v1.9.0
+## explicit; go 1.17
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
 # github.com/zpatrick/rbac v0.0.0-20180829190353-d2c4f050cf28
@@ -102,7 +103,7 @@ golang.org/x/sys/unix
 golang.org/x/sys/windows
 # gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15
 ## explicit
-# gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
+# gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
 # modernc.org/libc v1.37.6

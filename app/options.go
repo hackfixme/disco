@@ -8,7 +8,9 @@ import (
 	"github.com/mandelsoft/vfs/pkg/vfs"
 
 	actx "go.hackfix.me/disco/app/context"
+	"go.hackfix.me/disco/db"
 	"go.hackfix.me/disco/db/models"
+	"go.hackfix.me/disco/db/store"
 )
 
 // Option is a function that allows configuring the application.
@@ -49,6 +51,20 @@ func WithLogger(isStdoutTTY, isStderrTTY bool) Option {
 		)
 		app.ctx.Logger = logger
 		slog.SetDefault(logger)
+	}
+}
+
+// WithDB sets the main Disco database.
+func WithDB(d *db.DB) Option {
+	return func(app *App) {
+		app.ctx.DB = d
+	}
+}
+
+// WithStore sets the key-value store.
+func WithStore(store store.Store) Option {
+	return func(app *App) {
+		app.ctx.Store = store
 	}
 }
 

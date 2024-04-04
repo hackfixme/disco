@@ -114,9 +114,11 @@ func (app *App) createDataDir(dir string) error {
 
 func (app *App) initStores(dataDir string) error {
 	var err error
-	app.ctx.DB, err = initDB(app.ctx.Ctx, dataDir)
-	if err != nil {
-		return err
+	if app.ctx.DB == nil {
+		app.ctx.DB, err = initDB(app.ctx.Ctx, dataDir)
+		if err != nil {
+			return err
+		}
 	}
 
 	version, err := queries.Version(app.ctx.DB.NewContext(), app.ctx.DB)
@@ -138,9 +140,11 @@ func (app *App) initStores(dataDir string) error {
 		}
 	}
 
-	app.ctx.Store, err = initKVStore(app.ctx.Ctx, dataDir, app.ctx.User)
-	if err != nil {
-		return err
+	if app.ctx.Store == nil {
+		app.ctx.Store, err = initKVStore(app.ctx.Ctx, dataDir, app.ctx.User)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

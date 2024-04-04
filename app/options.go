@@ -37,13 +37,6 @@ func WithFS(fs vfs.FileSystem) Option {
 	}
 }
 
-// WithLocalUser sets the local user of the app.
-func WithLocalUser(user *models.User) Option {
-	return func(app *App) {
-		app.ctx.User = user
-	}
-}
-
 // WithLogger initializes the logger used by the application.
 func WithLogger(isStdoutTTY, isStderrTTY bool) Option {
 	return func(app *App) {

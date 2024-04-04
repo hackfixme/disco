@@ -10,6 +10,7 @@ import (
 
 // CLI is the command line interface of disco.
 type CLI struct {
+	kong *kong.Kong
 	kctx *kong.Context
 
 	Init   Init   `kong:"cmd,help='Initialize the data stores and generate the encryption key.'"`
@@ -28,13 +29,13 @@ type CLI struct {
 }
 
 // New initializes the command-line interface.
-func New(appCtx *actx.Context, args []string, exitFn func(int), dataDir string) (*CLI, error) {
+func New(dataDir string) (*CLI, error) {
 	c := &CLI{}
 	kparser, err := kong.New(c,
 		kong.Name("disco"),
 		kong.UsageOnError(),
 		kong.DefaultEnvars("DISCO"),
-		kong.Exit(exitFn),
+		kong.Exit(func(int) {}),
 		kong.ConfigureHelp(kong.HelpOptions{
 			Compact:             true,
 			Summary:             true,
@@ -46,26 +47,39 @@ func New(appCtx *actx.Context, args []string, exitFn func(int), dataDir string) 
 		return nil, err
 	}
 
-	kparser.Stdout = appCtx.Stdout
-	kparser.Stderr = appCtx.Stderr
-
-	kctx, err := kparser.Parse(args)
-	if err != nil {
-		return nil, err
-	}
-
-	c.kctx = kctx
+	c.kong = kparser
 
 	return c, nil
 }
 
-// Execute starts the command execution.
+// Execute starts the command execution. Parse must be called before this method.
 func (c *CLI) Execute(appCtx *actx.Context) error {
+	if c.kctx == nil {
+		panic("the CLI wasn't initialized properly")
+	}
+	c.kong.Stdout = appCtx.Stdout
+	c.kong.Stderr = appCtx.Stderr
+
 	return c.kctx.Run(appCtx)
+}
+
+// Parse the given command line arguments. This method must be called before
+// Execute.
+func (c *CLI) Parse(args []string) error {
+	kctx, err := c.kong.Parse(args)
+	if err != nil {
+		return err
+	}
+	c.kctx = kctx
+
+	return nil
 }
 
 // Command returns the full path of the executed command.
 func (c *CLI) Command() string {
+	if c.kctx == nil {
+		panic("the CLI wasn't initialized properly")
+	}
 	cmdPath := []string{}
 	for _, p := range c.kctx.Path {
 		if p.Command != nil {

@@ -24,21 +24,19 @@ type App struct {
 	ctx  *actx.Context
 	cli  *cli.CLI
 	args []string
-
-	Exit func(int)
 }
 
 // New initializes a new application with the given options. dataDir specifies
 // the directory where application data will be stored, though this can be
 // overriden with the DISCO_DATA_DIR environment variable, and --data-dir CLI
 // flag.
-func New(dataDir string, opts ...Option) *App {
+func New(dataDir string, opts ...Option) (*App, error) {
 	defaultCtx := &actx.Context{
 		Ctx:     context.Background(),
 		Logger:  slog.Default(),
 		Version: version,
 	}
-	app := &App{ctx: defaultCtx, Exit: func(int) {}}
+	app := &App{ctx: defaultCtx}
 
 	for _, opt := range opts {
 		opt(app)
@@ -46,68 +44,80 @@ func New(dataDir string, opts ...Option) *App {
 
 	uuidgen, err := cuid2.Init(cuid2.WithLength(12))
 	if err != nil {
-		app.FatalIfErrorf(aerrors.NewRuntimeError(
-			"failed creating UUID generation function", err, ""))
+		return nil, aerrors.NewRuntimeError(
+			"failed creating UUID generation function", err, "")
 	}
 	app.ctx.UUIDGen = uuidgen
 
-	slog.SetDefault(app.ctx.Logger)
+	app.cli, err = cli.New(dataDir)
+	if err != nil {
+		return nil, err
+	}
 
-	app.cli, err = cli.New(app.ctx, app.args, app.Exit, dataDir)
-	app.FatalIfErrorf(err)
-
-	return app
+	return app, nil
 }
 
 // Run initializes the application environment and starts execution of the
 // application.
-func (app *App) Run() {
-	app.createDataDir(app.cli.DataDir)
+func (app *App) Run(args []string) error {
+	if err := app.cli.Parse(args); err != nil {
+		return err
+	}
+
+	if err := app.createDataDir(app.cli.DataDir); err != nil {
+		return err
+	}
 	storeDir := app.cli.DataDir
 	if app.ctx.FS.Name() == "MemoryFileSystem" {
 		// The SQLite lib will attempt to write directly with the os interface,
 		// so prevent it by using SQLite's in-memory support.
 		storeDir = ":memory:"
 	}
-	app.initStores(storeDir)
-
-	err := app.cli.Execute(app.ctx)
-	app.FatalIfErrorf(err)
-}
-
-// FatalIfErrorf terminates the application with an error message if err != nil.
-func (app *App) FatalIfErrorf(err error, args ...any) {
-	if err != nil {
-		msg := err.Error()
-		if errh, ok := err.(aerrors.WithHint); ok {
-			hint := errh.Hint()
-			if hint != "" {
-				args = append([]any{"hint", hint}, args...)
-			}
-		}
-		if errc, ok := err.(aerrors.WithCause); ok {
-			cause := errc.Cause()
-			if cause != nil {
-				args = append([]any{"cause", cause}, args...)
-			}
-		}
-		app.ctx.Logger.Error(msg, args...)
-		app.Exit(1)
+	if err := app.initStores(storeDir); err != nil {
+		return err
 	}
+
+	if err := app.cli.Execute(app.ctx); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (app *App) createDataDir(dir string) {
+// Errorf logs an error message, extracting a hint or cause field if available.
+func Errorf(err error, args ...any) {
+	msg := err.Error()
+	if errh, ok := err.(aerrors.WithHint); ok {
+		hint := errh.Hint()
+		if hint != "" {
+			args = append([]any{"hint", hint}, args...)
+		}
+	}
+	if errc, ok := err.(aerrors.WithCause); ok {
+		cause := errc.Cause()
+		if cause != nil {
+			args = append([]any{"cause", cause}, args...)
+		}
+	}
+
+	slog.Error(msg, args...)
+}
+
+func (app *App) createDataDir(dir string) error {
 	err := app.ctx.FS.MkdirAll(dir, 0o700)
 	if err != nil {
-		app.FatalIfErrorf(aerrors.NewRuntimeError(
-			fmt.Sprintf("failed creating app data directory '%s'", dir), err, ""))
+		return aerrors.NewRuntimeError(
+			fmt.Sprintf("failed creating app data directory '%s'", dir), err, "")
 	}
+	return nil
 }
 
-func (app *App) initStores(dataDir string) {
+func (app *App) initStores(dataDir string) error {
 	var err error
 	app.ctx.DB, err = initDB(app.ctx.Ctx, dataDir)
-	app.FatalIfErrorf(err)
+	if err != nil {
+		return err
+	}
 
 	version, err := queries.Version(app.ctx.DB.NewContext(), app.ctx.DB)
 	if version.Valid {
@@ -122,12 +132,18 @@ func (app *App) initStores(dataDir string) {
 		// The encryption key is only required for specific commands.
 		encKeyCommands := []string{"get", "set", "ls", "serve", "invite user", "remote add"}
 		readEncKey := slices.Contains(encKeyCommands, cmd)
-		err := app.ctx.LoadLocalUser(readEncKey)
-		app.FatalIfErrorf(err)
+		err = app.ctx.LoadLocalUser(readEncKey)
+		if err != nil {
+			return err
+		}
 	}
 
 	app.ctx.Store, err = initKVStore(app.ctx.Ctx, dataDir, app.ctx.User)
-	app.FatalIfErrorf(err)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func initDB(ctx context.Context, dataDir string) (*db.DB, error) {

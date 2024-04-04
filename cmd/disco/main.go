@@ -14,9 +14,9 @@ import (
 )
 
 func main() {
-	// NOTE: The order of the passed options is significant, as some options depend
-	// on the values set by previous ones.
-	app.New(filepath.Join(xdg.DataHome, "disco"),
+	// NOTE: The order of the passed options is significant, as some options
+	// depend on the values set by previous ones.
+	a, err := app.New(filepath.Join(xdg.DataHome, "disco"),
 		app.WithFDs(
 			os.Stdin,
 			colorable.NewColorable(os.Stdout),
@@ -27,10 +27,16 @@ func main() {
 			isatty.IsTerminal(os.Stdout.Fd()),
 			isatty.IsTerminal(os.Stderr.Fd()),
 		),
-		app.WithExit(os.Exit),
-		app.WithArgs(os.Args[1:]),
 		app.WithEnv(osEnv{}),
-	).Run()
+	)
+	if err != nil {
+		app.Errorf(err)
+		os.Exit(1)
+	}
+	if err = a.Run(os.Args[1:]); err != nil {
+		app.Errorf(err)
+		os.Exit(1)
+	}
 }
 
 type osEnv struct{}

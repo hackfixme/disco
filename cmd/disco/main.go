@@ -11,6 +11,7 @@ import (
 
 	"go.hackfix.me/disco/app"
 	actx "go.hackfix.me/disco/app/context"
+	aerrors "go.hackfix.me/disco/app/errors"
 )
 
 func main() {
@@ -30,11 +31,11 @@ func main() {
 		app.WithEnv(osEnv{}),
 	)
 	if err != nil {
-		app.Errorf(err)
+		aerrors.Errorf(err)
 		os.Exit(1)
 	}
 	if err = a.Run(os.Args[1:]); err != nil {
-		app.Errorf(err)
+		aerrors.Errorf(err)
 		os.Exit(1)
 	}
 }

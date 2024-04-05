@@ -84,25 +84,6 @@ func (app *App) Run(args []string) error {
 	return nil
 }
 
-// Errorf logs an error message, extracting a hint or cause field if available.
-func Errorf(err error, args ...any) {
-	msg := err.Error()
-	if errh, ok := err.(aerrors.WithHint); ok {
-		hint := errh.Hint()
-		if hint != "" {
-			args = append([]any{"hint", hint}, args...)
-		}
-	}
-	if errc, ok := err.(aerrors.WithCause); ok {
-		cause := errc.Cause()
-		if cause != nil {
-			args = append([]any{"cause", cause}, args...)
-		}
-	}
-
-	slog.Error(msg, args...)
-}
-
 func (app *App) createDataDir(dir string) error {
 	err := app.ctx.FS.MkdirAll(dir, 0o700)
 	if err != nil {

@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"path/filepath"
 	"slices"
+	"strings"
+	"time"
 
 	"github.com/nrednav/cuid2"
 
@@ -132,11 +135,22 @@ func (app *App) initStores(dataDir string) error {
 }
 
 func initDB(ctx context.Context, dataDir string) (*db.DB, error) {
+	var d *db.DB
 	dbPath := dataDir
-	if dbPath != ":memory:" {
+	if strings.Contains(dbPath, "mode=memory") {
+		defer func() {
+			if d != nil {
+				// See https://github.com/mattn/go-sqlite3#faq
+				d.SetMaxIdleConns(10)
+				d.SetConnMaxLifetime(time.Duration(math.Inf(1)))
+			}
+		}()
+	} else {
 		dbPath = filepath.Join(dataDir, "disco.db")
 	}
-	d, err := db.Open(ctx, dbPath)
+
+	var err error
+	d, err = db.Open(ctx, dbPath)
 	if err != nil {
 		return nil, err
 	}
@@ -151,8 +165,17 @@ func initDB(ctx context.Context, dataDir string) (*db.DB, error) {
 }
 
 func initKVStore(ctx context.Context, dataDir string, localUser *models.User) (store.Store, error) {
+	var s *sqlite.Store
 	storePath := dataDir
-	if storePath != ":memory:" {
+	if strings.Contains(storePath, "mode=memory") {
+		defer func() {
+			if s != nil {
+				// See https://github.com/mattn/go-sqlite3#faq
+				s.SetMaxIdleConns(10)
+				s.SetConnMaxLifetime(time.Duration(math.Inf(1)))
+			}
+		}()
+	} else {
 		storePath = filepath.Join(dataDir, "store.db")
 	}
 
@@ -161,10 +184,11 @@ func initKVStore(ctx context.Context, dataDir string, localUser *models.User) (s
 		storeOpts = append(storeOpts, sqlite.WithEncryptionKey(localUser.PrivateKey))
 	}
 
-	store, err := sqlite.Open(ctx, storePath, storeOpts...)
+	var err error
+	s, err = sqlite.Open(ctx, storePath, storeOpts...)
 	if err != nil {
 		return nil, err
 	}
 
-	return store, nil
+	return s, nil
 }

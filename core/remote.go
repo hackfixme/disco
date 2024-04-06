@@ -2,7 +2,9 @@ package core
 
 import (
 	"context"
+	"crypto/ed25519"
 	"fmt"
+	"slices"
 
 	"github.com/mr-tron/base58"
 
@@ -35,13 +37,20 @@ func RemoteAuth(ctx context.Context, address, token string) (
 		return "", nil, nil, fmt.Errorf("failed performing ECDH key exchange: %w", err)
 	}
 
-	// 3. Send a join request to the remote node, providing the random token and
+	// 3. Sign the random token data so that the server can confirm the request
+	// comes from a trusted client. This avoids replay attacks if the token is
+	// intercepted in transit.
+	privSignKey := ed25519.NewKeyFromSeed(sharedKey)
+	tokenSig := ed25519.Sign(privSignKey, tokenData)
+	tokenConcat := slices.Concat(tokenSig, tokenData)
+
+	// 4. Send a join request to the remote node, providing the random token and
 	// the local X25519 public key. If the token is valid and not expired, the
 	// remote node will generate a TLS client certificate and private key,
 	// encrypt them with the shared key, and send them in the response, along
 	// with the server (CA) cert.
 	c := client.New(address, nil)
-	joinResp, err := c.RemoteJoin(ctx, base58.Encode(tokenData), base58.Encode(pubKeyData))
+	joinResp, err := c.RemoteJoin(ctx, base58.Encode(tokenConcat), base58.Encode(pubKeyData))
 	if err != nil {
 		return "", nil, nil, err
 	}
@@ -54,7 +63,7 @@ func RemoteAuth(ctx context.Context, address, token string) (
 		return "", nil, nil, fmt.Errorf("failed decoding TLS client private key: %w", err)
 	}
 
-	// 4. Decrypt the client certificate and private key with the shared key.
+	// 5. Decrypt the client certificate and private key with the shared key.
 	var sharedKeyArr [32]byte
 	copy(sharedKeyArr[:], sharedKey)
 	tlsClientCert, err = crypto.DecryptSymInMemory(tlsClientCertDec, &sharedKeyArr)

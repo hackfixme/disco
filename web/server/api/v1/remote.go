@@ -1,7 +1,9 @@
 package api
 
 import (
+	"crypto/ed25519"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -17,15 +19,23 @@ import (
 
 // RemoteJoin authenticates a remote Disco node.
 // The request is expected to contain an Authorization header with a random
-// token encoded as a base 58 string. If the token matches an existing and valid
-// invitation record, the request body is read, which is expected to contain the
-// client's X25519 public key. If successful, ECDH key exchange is performed to
-// generate the shared secret key, used to encrypt the generated TLS client
-// certificate that is sent in the response.
+// token encoded as a base 58 string, and its signature. If the token matches an
+// existing and valid invitation record, the request body is read, which is
+// expected to contain the client's X25519 public key. If successful, ECDH key
+// exchange is performed to generate the shared secret key, which is used to
+// verify the token signature, and encrypt the generated TLS client certificate
+// that is sent in the response.
 func (h *Handler) RemoteJoin(w http.ResponseWriter, r *http.Request) {
-	token := r.Header.Get("Authorization")
+	// Extract the token signature and data from the Authorization header.
+	tokenBundle := r.Header.Get("Authorization")
+	tokenSig, tokenData, err := decodeToken(tokenBundle)
+	if err != nil {
+		_ = render.Render(w, r, types.ErrUnauthorized("invalid invite token"))
+		return
+	}
 
-	inv := &models.Invite{Token: token}
+	// Lookup the token in the DB.
+	inv := &models.Invite{Token: base58.Encode(tokenData)}
 	if err := inv.Load(h.appCtx.DB.NewContext(), h.appCtx.DB); err != nil {
 		var errNoRes dbtypes.ErrNoResult
 		if errors.As(err, &errNoRes) {
@@ -37,6 +47,7 @@ func (h *Handler) RemoteJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Read the client's X25519 pubkey from the request body.
 	clientPubKeyEnc, err := io.ReadAll(r.Body)
 	if err != nil {
 		_ = render.Render(w, r, types.ErrBadRequest(err))
@@ -55,12 +66,23 @@ func (h *Handler) RemoteJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Perform ECDH key exchange to generate the shared secret key.
 	sharedKey, _, err := crypto.ECDHExchange(clientPubKeyData, privKey.Bytes())
 	if err != nil {
 		_ = render.Render(w, r, types.ErrInternal(err))
 		return
 	}
 
+	// Finally, verify the token signature, using the shared key as a seed.
+	privSignKey := ed25519.NewKeyFromSeed(sharedKey)
+	sigVerified := ed25519.Verify(privSignKey.Public().(ed25519.PublicKey),
+		tokenData, tokenSig)
+	if !sigVerified {
+		_ = render.Render(w, r, types.ErrUnauthorized("invalid invite token"))
+		return
+	}
+
+	// All good, so generate the response payload.
 	serverCert, serverCertPEM, err := h.appCtx.ServerTLSCert()
 	if err != nil {
 		_ = render.Render(w, r, types.ErrInternal(err))
@@ -74,9 +96,9 @@ func (h *Handler) RemoteJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Encrypt the client's TLS cert and key with the shared key.
 	var sharedKeyArr [32]byte
 	copy(sharedKeyArr[:], sharedKey)
-
 	clientCertEnc, err := crypto.EncryptSymInMemory(clientCert, &sharedKeyArr)
 	if err != nil {
 		_ = render.Render(w, r, types.ErrInternal(err))
@@ -96,4 +118,16 @@ func (h *Handler) RemoteJoin(w http.ResponseWriter, r *http.Request) {
 		TLSClientKeyEnc:  base58.Encode(clientKeyEnc),
 	}
 	_ = render.Render(w, r, resp)
+}
+
+func decodeToken(token string) ([]byte, []byte, error) {
+	tokenDec, err := base58.Decode(token)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed decoding invite token: %w", err)
+	}
+	if len(tokenDec) != 96 {
+		return nil, nil, errors.New("invalid invite token")
+	}
+
+	return tokenDec[:64], tokenDec[64:], nil
 }

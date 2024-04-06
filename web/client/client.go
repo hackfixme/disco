@@ -23,7 +23,7 @@ func New(address string, tlsConfig *tls.Config) *Client {
 
 	return &Client{
 		Client: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: time.Minute,
 			Transport: &http.Transport{
 				DisableCompression: false,
 				TLSClientConfig:    tlsConfig,

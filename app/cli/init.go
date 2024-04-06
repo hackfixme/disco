@@ -9,6 +9,7 @@ import (
 	actx "go.hackfix.me/disco/app/context"
 	aerrors "go.hackfix.me/disco/app/errors"
 	"go.hackfix.me/disco/crypto"
+	"go.hackfix.me/disco/web/server/types"
 )
 
 // The Init command initializes the Disco data stores and generates a new
@@ -23,7 +24,7 @@ func (c *Init) Run(appCtx *actx.Context) error {
 	}
 
 	tlsCert, tlsPrivKey, err := crypto.NewTLSCert(
-		"disco server", []string{"localhost"}, time.Now().Add(24*time.Hour), nil,
+		"disco server", []string{types.ServerName}, time.Now().Add(24*time.Hour), nil,
 	)
 	if err != nil {
 		return fmt.Errorf("failed generating the server TLS certificate: %w", err)

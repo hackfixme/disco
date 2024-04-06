@@ -67,7 +67,7 @@ func (h *Handler) RemoteJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	clientCert, clientKey, err := crypto.NewTLSCert(
-		inv.User.Name, []string{"localhost"}, time.Now().Add(24*time.Hour), serverCert,
+		inv.User.Name, []string{types.ServerName}, time.Now().Add(24*time.Hour), serverCert,
 	)
 	if err != nil {
 		_ = render.Render(w, r, types.ErrInternal(err))

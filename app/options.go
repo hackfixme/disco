@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"io"
 	"log/slog"
 
@@ -15,6 +16,13 @@ import (
 
 // Option is a function that allows configuring the application.
 type Option func(*App)
+
+// WithContext sets the main context.
+func WithContext(ctx context.Context) Option {
+	return func(app *App) {
+		app.ctx.Ctx = ctx
+	}
+}
 
 // WithEnv sets the process environment used by the application.
 func WithEnv(env actx.Environment) Option {

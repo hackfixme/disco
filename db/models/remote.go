@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"time"
@@ -12,23 +13,28 @@ import (
 )
 
 type Remote struct {
-	ID        uint64
-	CreatedAt time.Time
-	Name      string
-	Address   string
-	TLSCACert string
+	ID           uint64
+	CreatedAt    time.Time
+	Name         string
+	Address      string
+	TLSCACert    string
+	TLSServerSAN string
 
 	tlsClientCertEnc []byte
 	tlsClientKeyEnc  []byte
 }
 
 // NewRemote creates a new remote object.
-func NewRemote(name, address string, tlsCACert string, tlsClientCertEnc, tlsClientKeyEnc []byte) *Remote {
+func NewRemote(
+	name, address, tlsCACert, tlsServerSAN string, tlsClientCertEnc,
+	tlsClientKeyEnc []byte,
+) *Remote {
 	return &Remote{
 		CreatedAt:        time.Now(),
 		Name:             name,
 		Address:          address,
 		TLSCACert:        tlsCACert,
+		TLSServerSAN:     tlsServerSAN,
 		tlsClientCertEnc: tlsClientCertEnc,
 		tlsClientKeyEnc:  tlsClientKeyEnc,
 	}
@@ -59,9 +65,10 @@ func (r *Remote) Save(ctx context.Context, d types.Querier, update bool) error {
 		op = fmt.Sprintf("updating remote with %s", filterStr)
 	} else {
 		stmt = `INSERT INTO remotes (
-				id, created_at, name, address, tls_ca_cert, tls_client_cert_enc, tls_client_key_enc)
-				VALUES (NULL, ?, ?, ?, ?, ?, ?)`
-		args = append(args, r.CreatedAt, r.Name, r.Address, r.TLSCACert, r.tlsClientCertEnc, r.tlsClientKeyEnc)
+				id, created_at, name, address, tls_ca_cert, tls_server_san, tls_client_cert_enc, tls_client_key_enc)
+				VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)`
+		args = append(args, r.CreatedAt, r.Name, r.Address, r.TLSCACert,
+			r.TLSServerSAN, r.tlsClientCertEnc, r.tlsClientKeyEnc)
 		op = "saving new remote"
 	}
 
@@ -115,9 +122,27 @@ func (r *Remote) Delete(ctx context.Context, d types.Querier) error {
 	return nil
 }
 
-// ClientTLSCert returns the unencrypted TLS client certificate and private key
+// ClientTLSConfig returns the TLS client configuration.
+func (r *Remote) ClientTLSConfig(encKey *[32]byte) (*tls.Config, error) {
+	tlsConfig := crypto.DefaultTLSConfig()
+
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM([]byte(r.TLSCACert))
+	tlsConfig.RootCAs = caCertPool
+
+	tlsClientCert, err := r.clientTLSCert(encKey)
+	if err != nil {
+		return nil, err
+	}
+	tlsConfig.Certificates = []tls.Certificate{*tlsClientCert}
+	tlsConfig.ServerName = r.TLSServerSAN
+
+	return tlsConfig, nil
+}
+
+// clientTLSCert returns the unencrypted TLS client certificate and private key
 // pair.
-func (r *Remote) ClientTLSCert(encKey *[32]byte) (*tls.Certificate, error) {
+func (r *Remote) clientTLSCert(encKey *[32]byte) (*tls.Certificate, error) {
 	tlsClientCert, err := crypto.DecryptSymInMemory(r.tlsClientCertEnc, encKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed decrypting TLS client certificate: %w", err)
@@ -166,7 +191,8 @@ func (r *Remote) createFilter(ctx context.Context, d types.Querier, limit int) (
 // be passed to limit the results.
 func Remotes(ctx context.Context, d types.Querier, filter *types.Filter) ([]*Remote, error) {
 	queryFmt := `SELECT r.id, r.created_at, r.name, r.address,
-					r.tls_ca_cert, r.tls_client_cert_enc, r.tls_client_key_enc
+					r.tls_ca_cert, r.tls_server_san, r.tls_client_cert_enc,
+					r.tls_client_key_enc
 				FROM remotes r
 				%s ORDER BY r.name ASC %s`
 
@@ -192,7 +218,7 @@ func Remotes(ctx context.Context, d types.Querier, filter *types.Filter) ([]*Rem
 	for rows.Next() {
 		r := Remote{}
 		err := rows.Scan(&r.ID, &r.CreatedAt, &r.Name, &r.Address, &r.TLSCACert,
-			&r.tlsClientCertEnc, &r.tlsClientKeyEnc)
+			&r.TLSServerSAN, &r.tlsClientCertEnc, &r.tlsClientKeyEnc)
 		if err != nil {
 			return nil, fmt.Errorf("failed scanning remote data: %w", err)
 		}

@@ -97,22 +97,25 @@ func (c *Context) LoadLocalUser(readEncKey bool) error {
 	return nil
 }
 
-// ServerTLSCert returns the TLS certificate and private key used by the server.
-func (c *Context) ServerTLSCert() (*tls.Certificate, []byte, error) {
-	certPEM, privKeyEnc, err := queries.GetServerTLSCert(c.DB.NewContext(), c.DB)
+// ServerTLSInfo returns the TLS certificate, private key and Subject
+// Alternative Name used by the server.
+func (c *Context) ServerTLSInfo() (
+	cert *tls.Certificate, certPEM []byte, san string, err error,
+) {
+	certPEMNull, privKeyEncNull, sanNull, err := queries.GetServerTLSInfo(c.DB.NewContext(), c.DB)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 
-	privKey, err := crypto.DecryptSymInMemory(privKeyEnc.V, c.User.PrivateKey)
+	privKey, err := crypto.DecryptSymInMemory(privKeyEncNull.V, c.User.PrivateKey)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed decrypting server TLS private key: %w", err)
+		return nil, nil, "", fmt.Errorf("failed decrypting server TLS private key: %w", err)
 	}
 
-	certPair, err := tls.X509KeyPair([]byte(certPEM.V), privKey)
+	certPair, err := tls.X509KeyPair([]byte(certPEMNull.V), privKey)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed parsing PEM encoded TLS certificate: %w", err)
+		return nil, nil, "", fmt.Errorf("failed parsing PEM encoded TLS certificate: %w", err)
 	}
 
-	return &certPair, []byte(certPEM.V), nil
+	return &certPair, []byte(certPEMNull.V), sanNull.V, nil
 }

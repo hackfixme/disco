@@ -36,21 +36,24 @@ func (r *Remote) Run(kctx *kong.Context, appCtx *actx.Context) error {
 
 	switch kctx.Args[1] {
 	case "add":
-		tlsCACert, tlsClientCert, tlsClientKey, err := core.RemoteAuth(appCtx.Ctx, r.Add.Address, r.Add.Token)
+		response, err := core.RemoteAuth(appCtx.Ctx, r.Add.Address, r.Add.Token)
 		if err != nil {
 			return err
 		}
 
-		tlsClientCertEnc, err := crypto.EncryptSymInMemory(tlsClientCert, appCtx.User.PrivateKey)
+		tlsClientCertEnc, err := crypto.EncryptSymInMemory(response.TLSClientCert, appCtx.User.PrivateKey)
 		if err != nil {
 			return fmt.Errorf("failed encrypting TLS client certificate: %w", err)
 		}
-		tlsClientKeyEnc, err := crypto.EncryptSymInMemory(tlsClientKey, appCtx.User.PrivateKey)
+		tlsClientKeyEnc, err := crypto.EncryptSymInMemory(response.TLSClientKey, appCtx.User.PrivateKey)
 		if err != nil {
 			return fmt.Errorf("failed encrypting TLS client private key: %w", err)
 		}
 
-		remote := models.NewRemote(r.Add.Name, r.Add.Address, tlsCACert, tlsClientCertEnc, tlsClientKeyEnc)
+		remote := models.NewRemote(
+			r.Add.Name, r.Add.Address, response.TLSCACert, response.TLSServerSAN,
+			tlsClientCertEnc, tlsClientKeyEnc,
+		)
 		if err := remote.Save(dbCtx, appCtx.DB, false); err != nil {
 			return err
 		}

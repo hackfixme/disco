@@ -3,5 +3,6 @@ CREATE TABLE _meta (
   id                  INTEGER      PRIMARY KEY CHECK (id = 1),
   version             VARCHAR(32)  UNIQUE NOT NULL,
   server_tls_cert     VARCHAR      UNIQUE NOT NULL,
-  server_tls_key_enc  BLOB         UNIQUE NOT NULL
+  server_tls_key_enc  BLOB         UNIQUE NOT NULL,
+  server_tls_san      VARCHAR(32)  UNIQUE NOT NULL
 );

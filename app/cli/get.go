@@ -1,14 +1,11 @@
 package cli
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
 
 	actx "go.hackfix.me/disco/app/context"
-	"go.hackfix.me/disco/crypto"
 	"go.hackfix.me/disco/db/models"
 	"go.hackfix.me/disco/web/client"
 )
@@ -42,17 +39,10 @@ func (c *Get) Run(appCtx *actx.Context) error {
 			return err
 		}
 
-		tlsConfig := crypto.DefaultTLSConfig()
-
-		caCertPool := x509.NewCertPool()
-		caCertPool.AppendCertsFromPEM([]byte(r.TLSCACert))
-		tlsConfig.RootCAs = caCertPool
-
-		tlsClientCert, err := r.ClientTLSCert(appCtx.User.PrivateKey)
+		tlsConfig, err := r.ClientTLSConfig(appCtx.User.PrivateKey)
 		if err != nil {
 			return err
 		}
-		tlsConfig.Certificates = []tls.Certificate{*tlsClientCert}
 
 		client := client.New(r.Address, tlsConfig)
 		ok, value, err = client.StoreGet(appCtx.Ctx, c.Namespace, c.Key)

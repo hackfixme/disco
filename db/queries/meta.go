@@ -34,21 +34,24 @@ func GetEncryptionPubKey(ctx context.Context, d types.Querier) (sql.Null[string]
 	return pubKey, nil
 }
 
-func GetServerTLSCert(ctx context.Context, d types.Querier) (
-	cert sql.Null[string], privKeyEnc sql.Null[[]byte], err error,
+func GetServerTLSInfo(ctx context.Context, d types.Querier) (
+	cert sql.Null[string], privKeyEnc sql.Null[[]byte], san sql.Null[string], err error,
 ) {
 	err = d.QueryRowContext(ctx,
-		`SELECT server_tls_cert, server_tls_key_enc FROM _meta`).
-		Scan(&cert, &privKeyEnc)
+		`SELECT server_tls_cert, server_tls_key_enc, server_tls_san FROM _meta`).
+		Scan(&cert, &privKeyEnc, &san)
 	if err != nil {
 		return
 	}
 
 	if !cert.Valid {
-		return cert, privKeyEnc, errors.New("server TLS certificate not found")
+		return cert, privKeyEnc, san, errors.New("server TLS certificate not found")
 	}
 	if !privKeyEnc.Valid {
-		return cert, privKeyEnc, errors.New("server TLS private key not found")
+		return cert, privKeyEnc, san, errors.New("server TLS private key not found")
+	}
+	if !san.Valid {
+		return cert, privKeyEnc, san, errors.New("server TLS SAN not found")
 	}
 
 	return

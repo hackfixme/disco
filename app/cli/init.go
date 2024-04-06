@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"crypto/rand"
 	"fmt"
 	"time"
 
@@ -9,7 +10,6 @@ import (
 	actx "go.hackfix.me/disco/app/context"
 	aerrors "go.hackfix.me/disco/app/errors"
 	"go.hackfix.me/disco/crypto"
-	"go.hackfix.me/disco/web/server/types"
 )
 
 // The Init command initializes the Disco data stores and generates a new
@@ -23,14 +23,20 @@ func (c *Init) Run(appCtx *actx.Context) error {
 		return fmt.Errorf("Disco is already initialized with version %s", appCtx.VersionInit)
 	}
 
+	rndSANb := make([]byte, 16)
+	_, err := rand.Read(rndSANb)
+	if err != nil {
+		return err
+	}
+	rndSAN := base58.Encode(rndSANb)
 	tlsCert, tlsPrivKey, err := crypto.NewTLSCert(
-		"disco server", []string{types.ServerName}, time.Now().Add(24*time.Hour), nil,
+		"disco server", []string{rndSAN}, time.Now().Add(24*time.Hour), nil,
 	)
 	if err != nil {
 		return fmt.Errorf("failed generating the server TLS certificate: %w", err)
 	}
 
-	appCtx.User, err = appCtx.DB.Init(appCtx.Version, tlsCert, tlsPrivKey)
+	appCtx.User, err = appCtx.DB.Init(appCtx.Version, tlsCert, tlsPrivKey, rndSAN)
 	if err != nil {
 		return aerrors.NewRuntimeError("failed initializing database", err, "")
 	}

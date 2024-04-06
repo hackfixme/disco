@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"crypto/ed25519"
+	"encoding/json"
 	"fmt"
 	"slices"
 
@@ -10,6 +11,7 @@ import (
 
 	"go.hackfix.me/disco/crypto"
 	"go.hackfix.me/disco/web/client"
+	"go.hackfix.me/disco/web/server/types"
 )
 
 // RemoteAuth attempts to connect to a remote Disco server, and authenticate
@@ -21,20 +23,20 @@ import (
 // client private key.
 // See the inline comments for details about the process.
 func RemoteAuth(ctx context.Context, address, token string) (
-	tlsCACert string, tlsClientCert, tlsClientKey []byte, err error,
+	*types.RemoteJoinResponsePayload, error,
 ) {
 	// 1. Extract the random token data, and the remote X25519 public key from
 	// the composite token.
 	tokenData, remotePubKeyData, err := decodeToken(token)
 	if err != nil {
-		return "", nil, nil, err
+		return nil, err
 	}
 
 	// 2. Generate an ephemeral X25519 key pair, and perform ECDH key exchange
 	// in order to generate a shared secret key.
 	sharedKey, pubKeyData, err := crypto.ECDHExchange(remotePubKeyData, nil)
 	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed performing ECDH key exchange: %w", err)
+		return nil, fmt.Errorf("failed performing ECDH key exchange: %w", err)
 	}
 
 	// 3. Sign the random token data so that the server can confirm the request
@@ -50,33 +52,26 @@ func RemoteAuth(ctx context.Context, address, token string) (
 	// encrypt them with the shared key, and send them in the response, along
 	// with the server (CA) cert.
 	c := client.New(address, nil)
-	joinResp, err := c.RemoteJoin(ctx, base58.Encode(tokenConcat), base58.Encode(pubKeyData))
+	joinRespEnc, err := c.RemoteJoin(ctx, base58.Encode(tokenConcat), base58.Encode(pubKeyData))
 	if err != nil {
-		return "", nil, nil, err
-	}
-	tlsClientCertDec, err := base58.Decode(joinResp.TLSClientCertEnc)
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed decoding TLS client certificate: %w", err)
-	}
-	tlsClientKeyDec, err := base58.Decode(joinResp.TLSClientKeyEnc)
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed decoding TLS client private key: %w", err)
+		return nil, err
 	}
 
-	// 5. Decrypt the client certificate and private key with the shared key.
+	// 5. Decrypt the response payload with the shared key.
 	var sharedKeyArr [32]byte
 	copy(sharedKeyArr[:], sharedKey)
-	tlsClientCert, err = crypto.DecryptSymInMemory(tlsClientCertDec, &sharedKeyArr)
+	joinRespJSON, err := crypto.DecryptSymInMemory(joinRespEnc, &sharedKeyArr)
 	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed decrypting TLS client certificate: %w", err)
+		return nil, fmt.Errorf("failed decrypting join response payload: %w", err)
 	}
 
-	tlsClientKey, err = crypto.DecryptSymInMemory(tlsClientKeyDec, &sharedKeyArr)
+	joinResp := &types.RemoteJoinResponsePayload{}
+	err = json.Unmarshal(joinRespJSON, joinResp)
 	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed decrypting TLS client private key: %w", err)
+		return nil, fmt.Errorf("failed unmarshalling response body: %w", err)
 	}
 
-	return joinResp.TLSCACert, tlsClientCert, tlsClientKey, nil
+	return joinResp, nil
 }
 
 func decodeToken(token string) ([]byte, []byte, error) {

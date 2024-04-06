@@ -14,7 +14,9 @@ import (
 )
 
 // Init creates the database schema and initial records.
-func (d *DB) Init(appVersion string, serverTLSCert, serverTLSKey []byte) (localUser *models.User, err error) {
+func (d *DB) Init(
+	appVersion string, serverTLSCert, serverTLSKey []byte, serverTLSSAN string,
+) (localUser *models.User, err error) {
 	err = migrator.RunMigrations(d, d.migrations, migrator.MigrationUp, "all")
 	if err != nil {
 		return nil, err
@@ -37,8 +39,8 @@ func (d *DB) Init(appVersion string, serverTLSCert, serverTLSKey []byte) (localU
 	}
 
 	_, err = d.ExecContext(dbCtx,
-		`INSERT INTO _meta (version, server_tls_cert, server_tls_key_enc)
-		VALUES (?, ?, ?)`, appVersion, serverTLSCert, serverTLSKeyEnc)
+		`INSERT INTO _meta (version, server_tls_cert, server_tls_key_enc, server_tls_san)
+		VALUES (?, ?, ?, ?)`, appVersion, serverTLSCert, serverTLSKeyEnc, serverTLSSAN)
 	if err != nil {
 		return nil, err
 	}

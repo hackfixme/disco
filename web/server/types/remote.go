@@ -2,7 +2,13 @@ package types
 
 type RemoteJoinResponse struct {
 	*Response
-	TLSCACert        string `json:"tls_ca_cert"`
-	TLSClientCertEnc string `json:"tls_client_cert_enc"`
-	TLSClientKeyEnc  string `json:"tls_client_key_enc"`
+	// Encrypted payload in JSON format, encoded in base58
+	Data string `json:"data"`
+}
+
+type RemoteJoinResponsePayload struct {
+	TLSCACert     string `json:"tls_ca_cert"`
+	TLSServerSAN  string `json:"tls_server_san"`
+	TLSClientCert []byte `json:"tls_client_cert"`
+	TLSClientKey  []byte `json:"tls_client_key"`
 }

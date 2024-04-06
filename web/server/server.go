@@ -26,7 +26,7 @@ type Server struct {
 // for TLS connections over which store data will be transferred.
 func New(appCtx *actx.Context, addr string) (*Server, error) {
 	tlsCfg := crypto.DefaultTLSConfig()
-	cert, certPEM, err := appCtx.ServerTLSCert()
+	cert, certPEM, _, err := appCtx.ServerTLSInfo()
 	if err != nil {
 		return nil, err
 	}

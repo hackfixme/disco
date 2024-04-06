@@ -2,6 +2,7 @@ package api
 
 import (
 	"crypto/ed25519"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -83,39 +84,44 @@ func (h *Handler) RemoteJoin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// All good, so generate the response payload.
-	serverCert, serverCertPEM, err := h.appCtx.ServerTLSCert()
+	serverCert, serverCertPEM, serverSAN, err := h.appCtx.ServerTLSInfo()
 	if err != nil {
 		_ = render.Render(w, r, types.ErrInternal(err))
 		return
 	}
 	clientCert, clientKey, err := crypto.NewTLSCert(
-		inv.User.Name, []string{types.ServerName}, time.Now().Add(24*time.Hour), serverCert,
+		inv.User.Name, []string{serverSAN}, time.Now().Add(24*time.Hour), serverCert,
 	)
 	if err != nil {
 		_ = render.Render(w, r, types.ErrInternal(err))
 		return
 	}
 
-	// Encrypt the client's TLS cert and key with the shared key.
-	var sharedKeyArr [32]byte
-	copy(sharedKeyArr[:], sharedKey)
-	clientCertEnc, err := crypto.EncryptSymInMemory(clientCert, &sharedKeyArr)
+	payload := &types.RemoteJoinResponsePayload{
+		TLSCACert:     string(serverCertPEM),
+		TLSServerSAN:  serverSAN,
+		TLSClientCert: clientCert,
+		TLSClientKey:  clientKey,
+	}
+
+	payloadJSON, err := json.Marshal(payload)
 	if err != nil {
 		_ = render.Render(w, r, types.ErrInternal(err))
 		return
 	}
 
-	clientKeyEnc, err := crypto.EncryptSymInMemory(clientKey, &sharedKeyArr)
+	// Encrypt the payload with shared key.
+	var sharedKeyArr [32]byte
+	copy(sharedKeyArr[:], sharedKey)
+	payloadEnc, err := crypto.EncryptSymInMemory(payloadJSON, &sharedKeyArr)
 	if err != nil {
 		_ = render.Render(w, r, types.ErrInternal(err))
 		return
 	}
 
 	resp := &types.RemoteJoinResponse{
-		Response:         &types.Response{StatusCode: http.StatusOK},
-		TLSCACert:        string(serverCertPEM),
-		TLSClientCertEnc: base58.Encode(clientCertEnc),
-		TLSClientKeyEnc:  base58.Encode(clientKeyEnc),
+		Response: &types.Response{StatusCode: http.StatusOK},
+		Data:     base58.Encode(payloadEnc),
 	}
 	_ = render.Render(w, r, resp)
 }

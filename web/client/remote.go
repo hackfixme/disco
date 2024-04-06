@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/mr-tron/base58"
 	"go.hackfix.me/disco/web/server/types"
 )
 
@@ -22,7 +23,7 @@ import (
 // certificate, encrypt it with the X25519 shared key, and send it in the
 // response body. This method returns the encrypted TLS client certificate and
 // client key, and the TLS CA certificate.
-func (c *Client) RemoteJoin(ctx context.Context, token, pubKey string) (*types.RemoteJoinResponse, error) {
+func (c *Client) RemoteJoin(ctx context.Context, token, pubKey string) ([]byte, error) {
 	url := &url.URL{Scheme: "http", Host: c.address, Path: "/api/v1/join"}
 
 	reqCtx, cancelReqCtx := context.WithCancel(ctx)
@@ -57,5 +58,10 @@ func (c *Client) RemoteJoin(ctx context.Context, token, pubKey string) (*types.R
 		return nil, errors.New(joinResp.Error)
 	}
 
-	return joinResp, nil
+	joinRespPayloadEnc, err := base58.Decode(joinResp.Data)
+	if err != nil {
+		return nil, fmt.Errorf("failed decoding response payload: %w", err)
+	}
+
+	return joinRespPayloadEnc, nil
 }

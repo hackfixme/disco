@@ -1,8 +1,7 @@
 package cli
 
 import (
-	"bytes"
-	"io"
+	"fmt"
 
 	"github.com/alecthomas/kong"
 
@@ -37,17 +36,21 @@ func (r *Remote) Run(kctx *kong.Context, appCtx *actx.Context) error {
 
 	switch kctx.Args[1] {
 	case "add":
-		tlsClientCert, err := core.RemoteAuth(appCtx.Ctx, r.Add.Address, r.Add.Token)
+		tlsCACert, tlsClientCert, tlsClientKey, err := core.RemoteAuth(appCtx.Ctx, r.Add.Address, r.Add.Token)
 		if err != nil {
 			return err
 		}
 
-		tlsClientCertEncR, err := crypto.EncryptSym(bytes.NewBuffer(tlsClientCert), appCtx.User.PrivateKey)
-		tlsClientCertEnc, err := io.ReadAll(tlsClientCertEncR)
+		tlsClientCertEnc, err := crypto.EncryptSymInMemory(tlsClientCert, appCtx.User.PrivateKey)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed encrypting TLS client certificate: %w", err)
 		}
-		remote := models.NewRemote(r.Add.Name, r.Add.Address, tlsClientCertEnc)
+		tlsClientKeyEnc, err := crypto.EncryptSymInMemory(tlsClientKey, appCtx.User.PrivateKey)
+		if err != nil {
+			return fmt.Errorf("failed encrypting TLS client private key: %w", err)
+		}
+
+		remote := models.NewRemote(r.Add.Name, r.Add.Address, tlsCACert, tlsClientCertEnc, tlsClientKeyEnc)
 		if err := remote.Save(dbCtx, appCtx.DB, false); err != nil {
 			return err
 		}

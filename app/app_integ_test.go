@@ -9,6 +9,83 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestAppStore(t *testing.T) {
+	t.Parallel()
+
+	tctx, cancel, h := newTestContext(t, 5*time.Second)
+	defer cancel()
+
+	app, err := newTestApp(tctx)
+	h(assert.NoError(t, err))
+
+	err = app.Run("init")
+	h(assert.NoError(t, err))
+
+	t.Run("ok/set_get", func(t *testing.T) {
+		err = app.Run("set", "key", "testvalue")
+		h(assert.NoError(t, err))
+
+		err = app.Run("set", "key2", "testvalue2")
+		h(assert.NoError(t, err))
+
+		err = app.Run("get", "key")
+		h(assert.NoError(t, err))
+		h(assert.Equal(t, "testvalue", app.stdout.String()))
+
+		err = app.Run("get", "key2")
+		h(assert.NoError(t, err))
+		h(assert.Equal(t, "testvalue2", app.stdout.String()))
+	})
+
+	t.Run("ok/set_get_namespace", func(t *testing.T) {
+		err = app.Run("set", "--namespace=dev", "myapp/key", "testvaluens")
+		h(assert.NoError(t, err))
+
+		err = app.Run("get", "--namespace=dev", "myapp/key")
+		h(assert.NoError(t, err))
+		h(assert.Equal(t, "testvaluens", app.stdout.String()))
+	})
+
+	t.Run("ok/ls", func(t *testing.T) {
+		err = app.Run("ls")
+		h(assert.NoError(t, err))
+		h(assert.Equal(t, "key\nkey2\n", app.stdout.String()))
+
+		err = app.Run("ls", "--namespace=dev")
+		h(assert.NoError(t, err))
+		h(assert.Equal(t, "myapp/key\n", app.stdout.String()))
+
+		err = app.Run("ls", "--namespace=*")
+		h(assert.NoError(t, err))
+
+		want := "NAMESPACE   KEY       \n" +
+			"default     key         \n" +
+			"            key2        \n" +
+			"dev         myapp/key   \n"
+		h(assert.Equal(t, want, app.stdout.String()))
+	})
+
+	t.Run("ok/rm_ls", func(t *testing.T) {
+		err = app.Run("rm", "key2")
+		h(assert.NoError(t, err))
+
+		err = app.Run("rm", "--namespace=dev", "myapp/key")
+		h(assert.NoError(t, err))
+
+		err = app.Run("ls", "--namespace=*")
+		h(assert.NoError(t, err))
+
+		want := "NAMESPACE   KEY \n" +
+			"default     key   \n"
+		h(assert.Equal(t, want, app.stdout.String()))
+	})
+
+	t.Run("err/missing_key", func(t *testing.T) {
+		err = app.Run("get", "missingkey")
+		h(assert.EqualError(t, err, "key 'missingkey' doesn't exist in the 'default' namespace"))
+	})
+}
+
 // Test the scenario of 2 Disco nodes, where one creates a user and invitation
 // token, and the other joins and reads a remote key over the network.
 func TestAppUserInviteJoin(t *testing.T) {

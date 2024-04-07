@@ -16,7 +16,6 @@ import (
 	actx "go.hackfix.me/disco/app/context"
 	aerrors "go.hackfix.me/disco/app/errors"
 	"go.hackfix.me/disco/db"
-	"go.hackfix.me/disco/db/models"
 	"go.hackfix.me/disco/db/queries"
 	"go.hackfix.me/disco/db/store"
 	"go.hackfix.me/disco/db/store/sqlite"
@@ -125,7 +124,11 @@ func (app *App) initStores(dataDir string) error {
 	}
 
 	if app.ctx.Store == nil {
-		app.ctx.Store, err = initKVStore(app.ctx.Ctx, dataDir, app.ctx.User)
+		var encKey *[32]byte
+		if app.ctx.User != nil {
+			encKey = app.ctx.User.PrivateKey
+		}
+		app.ctx.Store, err = initKVStore(app.ctx.Ctx, dataDir, encKey)
 		if err != nil {
 			return err
 		}
@@ -164,7 +167,7 @@ func initDB(ctx context.Context, dataDir string) (*db.DB, error) {
 	return d, nil
 }
 
-func initKVStore(ctx context.Context, dataDir string, localUser *models.User) (store.Store, error) {
+func initKVStore(ctx context.Context, dataDir string, encKey *[32]byte) (store.Store, error) {
 	var s *sqlite.Store
 	storePath := dataDir
 	if strings.Contains(storePath, "mode=memory") {
@@ -180,8 +183,8 @@ func initKVStore(ctx context.Context, dataDir string, localUser *models.User) (s
 	}
 
 	storeOpts := []sqlite.Option{}
-	if localUser != nil {
-		storeOpts = append(storeOpts, sqlite.WithEncryptionKey(localUser.PrivateKey))
+	if encKey != nil {
+		storeOpts = append(storeOpts, sqlite.WithEncryptionKey(encKey))
 	}
 
 	var err error

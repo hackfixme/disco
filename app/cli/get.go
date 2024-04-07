@@ -56,9 +56,11 @@ func (c *Get) Run(appCtx *actx.Context) error {
 		}
 	}
 
-	if ok {
-		fmt.Fprintf(appCtx.Stdout, "%s", value)
+	if !ok {
+		return fmt.Errorf("key '%s' doesn't exist in the '%s' namespace", c.Key, c.Namespace)
 	}
+
+	fmt.Fprintf(appCtx.Stdout, "%v", value)
 
 	return nil
 }

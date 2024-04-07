@@ -113,6 +113,12 @@ func (inv *Invite) Save(ctx context.Context, d types.Querier, update bool) error
 		} else if n == 0 {
 			return types.ErrNoResult{Msg: fmt.Sprintf("invite with %s doesn't exist", filterStr)}
 		}
+	} else {
+		invID, err := res.LastInsertId()
+		if err != nil {
+			return err
+		}
+		inv.ID = uint64(invID)
 	}
 
 	return err

@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bytes"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
@@ -81,13 +80,13 @@ func (h *Handler) RemoteJoin(w http.ResponseWriter, r *http.Request) {
 	var sharedKeyArr [32]byte
 	copy(sharedKeyArr[:], sharedKey)
 
-	tlsClientCertEnc, err := encrypt(clientCert, &sharedKeyArr)
+	tlsClientCertEnc, err := crypto.EncryptSymInMemory(clientCert, &sharedKeyArr)
 	if err != nil {
 		_ = render.Render(w, r, types.ErrInternal(err))
 		return
 	}
 
-	tlsClientKeyEnc, err := encrypt(clientKey, &sharedKeyArr)
+	tlsClientKeyEnc, err := crypto.EncryptSymInMemory(clientKey, &sharedKeyArr)
 	if err != nil {
 		_ = render.Render(w, r, types.ErrInternal(err))
 		return
@@ -118,17 +117,4 @@ func (h *Handler) RemoteJoin(w http.ResponseWriter, r *http.Request) {
 		TLSClientKeyEnc:  base58.Encode(tlsClientKeyEnc),
 	}
 	_ = render.Render(w, r, resp)
-}
-
-func encrypt(data []byte, key *[32]byte) ([]byte, error) {
-	dataEncR, err := crypto.EncryptSym(bytes.NewBuffer(data), key)
-	if err != nil {
-		return nil, err
-	}
-	dataEnc, err := io.ReadAll(dataEncR)
-	if err != nil {
-		return nil, err
-	}
-
-	return dataEnc, nil
 }

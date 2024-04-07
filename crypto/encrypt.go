@@ -25,6 +25,36 @@ func EncryptSym(plaintext io.Reader, secretKey *[32]byte) (io.Reader, error) {
 	return encrypt(plaintext, nil, secretKey)
 }
 
+// EncryptSymInMemory performs symmetric encryption of the plaintext data in
+// memory using NaCl primitives (Curve25519, XSalsa20 and Poly1305).
+func EncryptSymInMemory(plaintext []byte, key *[32]byte) ([]byte, error) {
+	ciphertextR, err := encrypt(bytes.NewBuffer(plaintext), nil, key)
+	if err != nil {
+		return nil, err
+	}
+	ciphertext, err := io.ReadAll(ciphertextR)
+	if err != nil {
+		return nil, err
+	}
+
+	return ciphertext, nil
+}
+
+// DecryptSymInMemory performs symmetric decryption of the plaintext data in
+// memory using NaCl primitives (Curve25519, XSalsa20 and Poly1305).
+func DecryptSymInMemory(ciphertext []byte, key *[32]byte) ([]byte, error) {
+	plaintextR, err := decrypt(bytes.NewBuffer(ciphertext), nil, key)
+	if err != nil {
+		return nil, err
+	}
+	plaintext, err := io.ReadAll(plaintextR)
+	if err != nil {
+		return nil, err
+	}
+
+	return plaintext, nil
+}
+
 // EncryptAsym performs asymmetric encryption of the plaintext data using NaCl
 // primitives (Curve25519, XSalsa20 and Poly1305).
 func EncryptAsym(plaintext io.Reader, publicKey, privateKey *[32]byte) (io.Reader, error) {

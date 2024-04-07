@@ -137,21 +137,21 @@ func (me *mockEnv) Set(key, val string) error {
 // hookWriter is an io.Writer implementation that listens for writes and
 // notifies subscribers when specific text is written.
 type hookWriter struct {
-	*bytes.Buffer               // main buffer read by tests
-	tmp           *bytes.Buffer // temp buffer written to during each command
-	ctx           context.Context
-	w             chan []byte
-	mx            sync.RWMutex
-	subs          []chan []byte
+	*safeBuffer             // main buffer read by tests
+	tmp         *safeBuffer // temp buffer written to during each command
+	ctx         context.Context
+	mx          sync.RWMutex
+	w           chan []byte
+	subs        []chan []byte
 }
 
 func newHookWriter(ctx context.Context) *hookWriter {
 	hw := &hookWriter{
-		Buffer: &bytes.Buffer{},
-		tmp:    &bytes.Buffer{},
-		ctx:    ctx,
-		w:      make(chan []byte, 10),
-		subs:   make([]chan []byte, 0),
+		safeBuffer: newSafeBuffer(),
+		tmp:        newSafeBuffer(),
+		ctx:        ctx,
+		w:          make(chan []byte, 10),
+		subs:       make([]chan []byte, 0),
 	}
 
 	go func() {
@@ -263,4 +263,50 @@ func newTestContext(t *testing.T, timeout time.Duration) (
 	}
 
 	return
+}
+
+// safeBuffer is a thread-safe buffer.
+type safeBuffer struct {
+	mx  sync.RWMutex
+	buf *bytes.Buffer
+}
+
+func newSafeBuffer() *safeBuffer {
+	return &safeBuffer{buf: &bytes.Buffer{}}
+}
+
+func (b *safeBuffer) Read(p []byte) (n int, err error) {
+	b.mx.RLock()
+	defer b.mx.RUnlock()
+	return b.buf.Read(p)
+}
+
+func (b *safeBuffer) Write(p []byte) (n int, err error) {
+	b.mx.Lock()
+	defer b.mx.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *safeBuffer) ReadFrom(r io.Reader) (n int64, err error) {
+	b.mx.Lock()
+	defer b.mx.Unlock()
+	return b.buf.ReadFrom(r)
+}
+
+func (b *safeBuffer) Reset() {
+	b.mx.Lock()
+	defer b.mx.Unlock()
+	b.buf.Reset()
+}
+
+func (b *safeBuffer) String() string {
+	b.mx.RLock()
+	defer b.mx.RUnlock()
+	return b.buf.String()
+}
+
+func (b *safeBuffer) Bytes() []byte {
+	b.mx.RLock()
+	defer b.mx.RUnlock()
+	return b.buf.Bytes()
 }

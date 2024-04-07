@@ -34,7 +34,7 @@ func New(appCtx *actx.Context, addr string) *Server {
 
 // ListenAndServe is a replacement of http.ListenAndServe to ensure we set the
 // correct server address to be used in URLs, templates, etc.
-// E.g. this is needed when starting the server with ':0'.
+// This is needed when starting the server with address ':0'.
 func (s *Server) ListenAndServe() error {
 	ln, err := net.Listen("tcp", s.Addr)
 	if err != nil {
@@ -44,7 +44,12 @@ func (s *Server) ListenAndServe() error {
 	s.Addr = ln.Addr().String()
 	s.appCtx.Logger.Info("started web server", "address", s.Addr)
 
-	return s.Serve(ln)
+	hl := &HybridListener{
+		Listener:  ln,
+		tlsConfig: s.tlsConfig,
+		logger:    s.appCtx.Logger,
+	}
+	return s.Serve(hl)
 }
 
 func setupRouter(appCtx *actx.Context) chi.Router {

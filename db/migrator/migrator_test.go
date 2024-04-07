@@ -29,8 +29,8 @@ func TestCreateMigrationPlan(t *testing.T) {
 				{Name: "b", Applied: false, Up: up, Down: down},
 			}, typ: MigrationUp, to: "all",
 			expected: []migrationRun{
-				{name: "a", typ: MigrationUp, sql: up.Val},
-				{name: "b", typ: MigrationUp, sql: up.Val},
+				{name: "a", typ: MigrationUp, sql: up.V},
+				{name: "b", typ: MigrationUp, sql: up.V},
 			},
 		},
 		{
@@ -39,7 +39,7 @@ func TestCreateMigrationPlan(t *testing.T) {
 				{Name: "b", Applied: false, Up: up, Down: down},
 			}, typ: MigrationUp, to: "all",
 			expected: []migrationRun{
-				{name: "b", typ: MigrationUp, sql: up.Val},
+				{name: "b", typ: MigrationUp, sql: up.V},
 			},
 		},
 		{
@@ -48,7 +48,7 @@ func TestCreateMigrationPlan(t *testing.T) {
 				{Name: "b", Applied: false, Up: up, Down: down},
 			}, typ: MigrationUp, to: "a",
 			expected: []migrationRun{
-				{name: "a", typ: MigrationUp, sql: up.Val},
+				{name: "a", typ: MigrationUp, sql: up.V},
 			},
 		},
 		{
@@ -57,8 +57,8 @@ func TestCreateMigrationPlan(t *testing.T) {
 				{Name: "b", Applied: false, Up: up, Down: down},
 			}, typ: MigrationUp, to: "b",
 			expected: []migrationRun{
-				{name: "a", typ: MigrationUp, sql: up.Val},
-				{name: "b", typ: MigrationUp, sql: up.Val},
+				{name: "a", typ: MigrationUp, sql: up.V},
+				{name: "b", typ: MigrationUp, sql: up.V},
 			},
 		},
 		{
@@ -75,7 +75,7 @@ func TestCreateMigrationPlan(t *testing.T) {
 				{Name: "c", Applied: false, Up: up, Down: down},
 			}, typ: MigrationUp, to: "c",
 			expected: []migrationRun{
-				{name: "c", typ: MigrationUp, sql: up.Val},
+				{name: "c", typ: MigrationUp, sql: up.V},
 			},
 		},
 		// Down
@@ -85,7 +85,7 @@ func TestCreateMigrationPlan(t *testing.T) {
 				{Name: "b", Applied: false, Up: up, Down: down},
 			}, typ: MigrationDown, to: "all",
 			expected: []migrationRun{
-				{name: "a", typ: MigrationDown, sql: down.Val},
+				{name: "a", typ: MigrationDown, sql: down.V},
 			},
 		},
 		{
@@ -94,8 +94,8 @@ func TestCreateMigrationPlan(t *testing.T) {
 				{Name: "b", Applied: true, Up: up, Down: down},
 			}, typ: MigrationDown, to: "all",
 			expected: []migrationRun{
-				{name: "b", typ: MigrationDown, sql: down.Val},
-				{name: "a", typ: MigrationDown, sql: down.Val},
+				{name: "b", typ: MigrationDown, sql: down.V},
+				{name: "a", typ: MigrationDown, sql: down.V},
 			},
 		},
 		{
@@ -104,7 +104,7 @@ func TestCreateMigrationPlan(t *testing.T) {
 				{Name: "b", Applied: true, Up: up, Down: down},
 			}, typ: MigrationDown, to: "a",
 			expected: []migrationRun{
-				{name: "b", typ: MigrationDown, sql: down.Val},
+				{name: "b", typ: MigrationDown, sql: down.V},
 			},
 		},
 		{
@@ -114,8 +114,8 @@ func TestCreateMigrationPlan(t *testing.T) {
 				{Name: "c", Applied: true, Up: up, Down: down},
 			}, typ: MigrationDown, to: "a",
 			expected: []migrationRun{
-				{name: "c", typ: MigrationDown, sql: down.Val},
-				{name: "b", typ: MigrationDown, sql: down.Val},
+				{name: "c", typ: MigrationDown, sql: down.V},
+				{name: "b", typ: MigrationDown, sql: down.V},
 			},
 		},
 		{

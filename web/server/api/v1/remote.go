@@ -32,7 +32,7 @@ func (h *Handler) RemoteJoin(w http.ResponseWriter, r *http.Request) {
 	if err := inv.Load(h.appCtx.DB.NewContext(), h.appCtx.DB); err != nil {
 		var errNoRes dbtypes.ErrNoResult
 		if errors.As(err, &errNoRes) {
-			_ = render.Render(w, r, types.ErrUnauthorized())
+			_ = render.Render(w, r, types.ErrUnauthorized("invalid invite token"))
 			return
 		}
 

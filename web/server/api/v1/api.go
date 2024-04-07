@@ -45,7 +45,7 @@ func tlsOnly(next http.Handler) http.Handler {
 		connType := r.Context().Value(types.ConnTypeKey)
 		ct, ok := connType.(types.ConnType)
 		if !ok || ct != types.ConnTypeTLS {
-			_ = render.Render(w, r, types.ErrUnauthorized())
+			_ = render.Render(w, r, types.ErrUnauthorized("resource must be accessed over TLS"))
 			return
 		}
 

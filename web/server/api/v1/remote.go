@@ -2,7 +2,10 @@ package api
 
 import (
 	"bytes"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -62,9 +65,18 @@ func (h *Handler) RemoteJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	serverCert, err := h.appCtx.ServerTLSCert()
+	if err != nil {
+		_ = render.Render(w, r, types.ErrInternal(err))
+		return
+	}
 	clientCert, clientKey, err := crypto.NewTLSCert(
-		inv.User.Name, []string{"localhost"}, time.Now().Add(24*time.Hour), nil,
+		inv.User.Name, []string{"localhost"}, time.Now().Add(24*time.Hour), serverCert,
 	)
+	if err != nil {
+		_ = render.Render(w, r, types.ErrInternal(err))
+		return
+	}
 
 	var sharedKeyArr [32]byte
 	copy(sharedKeyArr[:], sharedKey)
@@ -81,12 +93,31 @@ func (h *Handler) RemoteJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = render.Render(w, r, &types.RemoteJoinResponse{
+	if len(serverCert.Certificate) == 0 {
+		_ = render.Render(w, r, types.ErrInternal(errors.New("no certificate data found in parent certificate")))
+		return
+	}
+
+	x509Cert, err := x509.ParseCertificate(serverCert.Certificate[0])
+	if err != nil {
+		_ = render.Render(w, r, types.ErrInternal(
+			fmt.Errorf("failed parsing server X.509 certificate: %w", err)))
+		return
+	}
+
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: x509Cert.Raw})
+	if certPEM == nil {
+		_ = render.Render(w, r, types.ErrInternal(errors.New("failed encoding TLS certificate to PEM")))
+		return
+	}
+
+	resp := &types.RemoteJoinResponse{
 		Response:         &types.Response{StatusCode: http.StatusOK},
-		TLSCACert:        string(h.appCtx.TLSCACert),
+		TLSCACert:        string(certPEM),
 		TLSClientCertEnc: base58.Encode(tlsClientCertEnc),
 		TLSClientKeyEnc:  base58.Encode(tlsClientKeyEnc),
-	})
+	}
+	_ = render.Render(w, r, resp)
 }
 
 func encrypt(data []byte, key *[32]byte) ([]byte, error) {

@@ -2,11 +2,13 @@ package cli
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/mr-tron/base58"
 
 	actx "go.hackfix.me/disco/app/context"
 	aerrors "go.hackfix.me/disco/app/errors"
+	"go.hackfix.me/disco/crypto"
 )
 
 // The Init command initializes the Disco data stores and generates a new
@@ -20,8 +22,14 @@ func (c *Init) Run(appCtx *actx.Context) error {
 		return fmt.Errorf("Disco is already initialized with version %s", appCtx.VersionInit)
 	}
 
-	var err error
-	appCtx.User, err = appCtx.DB.Init(appCtx.Version)
+	tlsCert, tlsPrivKey, err := crypto.NewTLSCert(
+		"disco server", []string{"localhost"}, time.Now().Add(24*time.Hour), nil,
+	)
+	if err != nil {
+		return fmt.Errorf("failed generating the server TLS certificate: %w", err)
+	}
+
+	appCtx.User, err = appCtx.DB.Init(appCtx.Version, tlsCert, tlsPrivKey)
 	if err != nil {
 		return aerrors.NewRuntimeError("failed initializing database", err, "")
 	}

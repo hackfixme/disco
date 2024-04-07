@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
 	"net"
 	"net/http"
 	"time"
@@ -27,21 +26,12 @@ type Server struct {
 // New returns a new web Server instance. It creates a self-signed certificate
 // for TLS connections over which store data will be transferred.
 func New(appCtx *actx.Context, addr string) (*Server, error) {
-	cert, pkey, err := crypto.NewTLSCert(
-		"disco server", []string{"localhost"}, time.Now().Add(24*time.Hour), nil,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed generating a new TLS certificate: %w", err)
-	}
-
 	tlsCfg := crypto.DefaultTLSConfig()
-	certPair, err := tls.X509KeyPair([]byte(cert), []byte(pkey))
+	cert, err := appCtx.ServerTLSCert()
 	if err != nil {
-		return nil, fmt.Errorf("failed parsing PEM encoded TLS certificate: %w", err)
+		return nil, err
 	}
-	tlsCfg.Certificates = []tls.Certificate{certPair}
-
-	appCtx.TLSCACert = cert
+	tlsCfg.Certificates = []tls.Certificate{*cert}
 
 	srv := &Server{
 		Server: &http.Server{

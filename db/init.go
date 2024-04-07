@@ -14,25 +14,31 @@ import (
 )
 
 // Init creates the database schema and initial records.
-func (d *DB) Init(appVersion string) (localUser *models.User, err error) {
+func (d *DB) Init(appVersion string, serverTLSCert, serverTLSKey []byte) (localUser *models.User, err error) {
 	err = migrator.RunMigrations(d, d.migrations, migrator.MigrationUp, "all")
 	if err != nil {
 		return nil, err
 	}
 
 	dbCtx := d.NewContext()
-	_, err = d.ExecContext(dbCtx,
-		`INSERT INTO _meta (version) VALUES (?)`, appVersion)
-	if err != nil {
-		return nil, err
-	}
-
 	roles, err := createRoles(dbCtx, d)
 	if err != nil {
 		return nil, err
 	}
 
 	localUser, err = createLocalUser(dbCtx, d, roles["admin"])
+	if err != nil {
+		return nil, err
+	}
+
+	serverTLSKeyEnc, err := crypto.EncryptSymInMemory(serverTLSKey, localUser.PrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed encrypting TLS private key: %w", err)
+	}
+
+	_, err = d.ExecContext(dbCtx,
+		`INSERT INTO _meta (version, server_tls_cert, server_tls_key_enc)
+		VALUES (?, ?, ?)`, appVersion, serverTLSCert, serverTLSKeyEnc)
 	if err != nil {
 		return nil, err
 	}

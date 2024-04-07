@@ -34,6 +34,26 @@ func GetEncryptionPubKey(ctx context.Context, d types.Querier) (sql.Null[string]
 	return pubKey, nil
 }
 
+func GetServerTLSCert(ctx context.Context, d types.Querier) (
+	cert sql.Null[string], privKeyEnc sql.Null[[]byte], err error,
+) {
+	err = d.QueryRowContext(ctx,
+		`SELECT server_tls_cert, server_tls_key_enc FROM _meta`).
+		Scan(&cert, &privKeyEnc)
+	if err != nil {
+		return
+	}
+
+	if !cert.Valid {
+		return cert, privKeyEnc, errors.New("server TLS certificate not found")
+	}
+	if !privKeyEnc.Valid {
+		return cert, privKeyEnc, errors.New("server TLS private key not found")
+	}
+
+	return
+}
+
 func GetAllTables(ctx context.Context, d types.Querier) (map[string]struct{}, error) {
 	allTables := make(map[string]struct{})
 	rows, err := d.QueryContext(ctx, `SELECT name FROM sqlite_master WHERE type = 'table'`)

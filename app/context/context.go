@@ -2,6 +2,7 @@ package context
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -40,9 +41,6 @@ type Context struct {
 	DB    *db.DB
 	Store store.Store
 	User  *models.User
-
-	// CA certificate of the TLS server, encoded in PEM format
-	TLSCACert []byte
 }
 
 // Environment is the interface to the process environment.
@@ -97,4 +95,24 @@ func (c *Context) LoadLocalUser(readEncKey bool) error {
 	}
 
 	return nil
+}
+
+// ServerTLSCert returns the TLS certificate and private key used by the server.
+func (c *Context) ServerTLSCert() (*tls.Certificate, error) {
+	cert, privKeyEnc, err := queries.GetServerTLSCert(c.DB.NewContext(), c.DB)
+	if err != nil {
+		return nil, err
+	}
+
+	privKey, err := crypto.DecryptSymInMemory(privKeyEnc.V, c.User.PrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed decrypting server TLS private key: %w", err)
+	}
+
+	certPair, err := tls.X509KeyPair([]byte(cert.V), privKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing PEM encoded TLS certificate: %w", err)
+	}
+
+	return &certPair, nil
 }

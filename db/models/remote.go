@@ -2,10 +2,12 @@ package models
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"time"
 
+	"go.hackfix.me/disco/crypto"
 	"go.hackfix.me/disco/db/types"
 )
 
@@ -88,6 +90,22 @@ func (r *Remote) Save(ctx context.Context, d types.Querier, update bool) error {
 // Load the remote record from the database. The remote ID or name must be set
 // for the lookup.
 func (r *Remote) Load(ctx context.Context, d types.Querier) error {
+	filter, filterStr, err := r.createFilter(ctx, d, 1)
+	if err != nil {
+		return fmt.Errorf("failed loading remote: %w", err)
+	}
+
+	remotes, err := Remotes(ctx, d, filter)
+	if err != nil {
+		return err
+	}
+
+	if len(remotes) == 0 {
+		return types.ErrNoResult{Msg: fmt.Sprintf("remote with %s doesn't exist", filterStr)}
+	}
+
+	*r = *remotes[0]
+
 	return nil
 }
 
@@ -127,4 +145,45 @@ func (r *Remote) createFilter(ctx context.Context, d types.Querier, limit int) (
 	}
 
 	return filter, filterStr, nil
+}
+
+// Remotes returns one or more remotes from the database. An optional filter can
+// be passed to limit the results.
+func Remotes(ctx context.Context, d types.Querier, filter *types.Filter) ([]*Remote, error) {
+	queryFmt := `SELECT r.id, r.created_at, r.name, r.address,
+					r.tls_ca_cert, r.tls_client_cert_enc, r.tls_client_key_enc
+				FROM remotes r
+				%s ORDER BY r.name ASC %s`
+
+	where := "1=1"
+	var limit string
+	args := []any{}
+	if filter != nil {
+		where = filter.Where
+		args = filter.Args
+		if filter.Limit > 0 {
+			limit = fmt.Sprintf("LIMIT %d", filter.Limit)
+		}
+	}
+
+	query := fmt.Sprintf(queryFmt, fmt.Sprintf("WHERE %s", where), limit)
+
+	rows, err := d.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed loading remotes: %w", err)
+	}
+
+	remotes := []*Remote{}
+	for rows.Next() {
+		r := Remote{}
+		err := rows.Scan(&r.ID, &r.CreatedAt, &r.Name, &r.Address, &r.TLSCACert,
+			&r.tlsClientCertEnc, &r.tlsClientKeyEnc)
+		if err != nil {
+			return nil, fmt.Errorf("failed scanning remote data: %w", err)
+		}
+
+		remotes = append(remotes, &r)
+	}
+
+	return remotes, nil
 }

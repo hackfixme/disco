@@ -55,11 +55,19 @@ func (c *Ls) Run(appCtx *actx.Context) error {
 		}
 		slices.Sort(namespaces)
 
+		data := make([][]string, 0)
 		for _, ns := range namespaces {
-			for _, key := range keysPerNS[ns] {
-				fmt.Fprintf(appCtx.Stdout, "%s:%s\n", ns, key)
+			for i, key := range keysPerNS[ns] {
+				row := []string{ns, key}
+				if i > 0 {
+					row[0] = ""
+				}
+				data = append(data, row)
 			}
 		}
+
+		header := []string{"Namespace", "Key"}
+		newTable(header, data, appCtx.Stdout).Render()
 	} else {
 		for ns := range keysPerNS {
 			for _, key := range keysPerNS[ns] {

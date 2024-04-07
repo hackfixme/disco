@@ -83,7 +83,15 @@ func (c *Role) Run(kctx *kong.Context, appCtx *actx.Context) error {
 				slices.Sort(actions)
 				actsJoined := strings.Join(actions, ",")
 
-				row := []string{role.Name, nsJoined, actsJoined, perm.TargetPattern}
+				target := fmt.Sprintf("%s:%s",
+					perm.Target.Resource, strings.Join(perm.Target.Patterns, ","))
+				if perm.Target.Resource == models.ResourceAny {
+					// If the resource is a wildcard, then the patterns must be
+					// wildcards as well.
+					target = "*"
+				}
+
+				row := []string{role.Name, nsJoined, actsJoined, target}
 				if i > 0 {
 					row[0] = ""
 				}

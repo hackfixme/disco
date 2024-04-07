@@ -24,12 +24,12 @@ type Ls struct {
 func (c *Ls) Run(appCtx *actx.Context) error {
 	var (
 		keysPerNS map[string][]string
-		err       error
+		listErr   error
 	)
 
 	if c.Remote != "" {
 		r := &models.Remote{Name: c.Remote}
-		if err = r.Load(appCtx.DB.NewContext(), appCtx.DB); err != nil {
+		if err := r.Load(appCtx.DB.NewContext(), appCtx.DB); err != nil {
 			return err
 		}
 
@@ -46,13 +46,13 @@ func (c *Ls) Run(appCtx *actx.Context) error {
 		tlsConfig.Certificates = []tls.Certificate{*tlsClientCert}
 
 		client := client.New(r.Address, tlsConfig)
-		keysPerNS, err = client.StoreList(appCtx.Ctx, c.Namespace, c.KeyPrefix)
+		keysPerNS, listErr = client.StoreList(appCtx.Ctx, c.Namespace, c.KeyPrefix)
 	} else {
-		keysPerNS, err = appCtx.Store.List(c.Namespace, c.KeyPrefix)
+		keysPerNS, listErr = appCtx.Store.List(c.Namespace, c.KeyPrefix)
 	}
 
-	if err != nil {
-		return err
+	if listErr != nil {
+		return listErr
 	}
 	if len(keysPerNS) == 0 {
 		return nil

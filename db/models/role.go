@@ -49,6 +49,7 @@ const (
 	ResourceStore Resource = "store"
 	ResourceUser  Resource = "user"
 	ResourceRole  Resource = "role"
+	ResourceAny   Resource = "*"
 )
 
 // ResourceFromString returns a valid Resource from a string value.
@@ -60,6 +61,8 @@ func ResourceFromString(res string) (Resource, error) {
 		return ResourceUser, nil
 	case "role":
 		return ResourceRole, nil
+	case "*":
+		return ResourceAny, nil
 	default:
 		return "", fmt.Errorf("invalid resource '%s'", res)
 	}
@@ -82,9 +85,14 @@ type Role struct {
 // wildcards, e.g. 'store:myapp/*'. Namespaces and actions can also be a
 // wildcard, to allow any action in any namespace (e.g. for admin roles).
 type Permission struct {
-	Namespaces    map[string]struct{}
-	Actions       map[Action]struct{}
-	TargetPattern string
+	Namespaces map[string]struct{}
+	Actions    map[Action]struct{}
+	Target     PermissionTarget
+}
+
+type PermissionTarget struct {
+	Resource Resource
+	Patterns []string
 }
 
 // Save the role to the database.
@@ -141,8 +149,13 @@ func (r *Role) Save(ctx context.Context, d types.Querier, update bool) error {
 		slices.Sort(actions)
 
 		values = append(values, `(:role_id, ?, ?, ?)`)
-		args = append(args, strings.Join(namespaces, ","),
-			string(actions), perm.TargetPattern)
+		var target string
+		if perm.Target.Resource == ResourceAny {
+			target = "*"
+		} else {
+			target = fmt.Sprintf("%s:%s", perm.Target.Resource, strings.Join(perm.Target.Patterns, ","))
+		}
+		args = append(args, strings.Join(namespaces, ","), string(actions), target)
 	}
 
 	stmt = fmt.Sprintf("%s %s", stmt, strings.Join(values, ", "))
@@ -162,9 +175,11 @@ func (r *Role) Can(action, target string) (bool, error) {
 		for _, perm := range r.Permissions {
 			for act := range perm.Actions {
 				for ns := range perm.Namespaces {
-					targetPattern := fmt.Sprintf("%s:%s", ns, perm.TargetPattern)
-					perms = append(perms,
-						rbac.NewGlobPermission(string(act), targetPattern))
+					for _, pat := range perm.Target.Patterns {
+						perms = append(perms,
+							rbac.NewGlobPermission(string(act),
+								fmt.Sprintf("%s:%s:%s", ns, perm.Target.Resource, pat)))
+					}
 				}
 			}
 		}
@@ -343,7 +358,7 @@ func Roles(ctx context.Context, d types.Querier, filter *types.Filter) ([]*Role,
 			for _, actRune := range r.Actions.V {
 				act, ok := actionMap[actRune]
 				if !ok {
-					return nil, fmt.Errorf("invalid action '%s'", string(actRune))
+					return nil, fmt.Errorf("invalid action: %s", string(actRune))
 				}
 				actions[act] = struct{}{}
 			}
@@ -351,7 +366,22 @@ func Roles(ctx context.Context, d types.Querier, filter *types.Filter) ([]*Role,
 
 		perm := Permission{Namespaces: namespaces, Actions: actions}
 		if r.Target.Valid {
-			perm.TargetPattern = r.Target.V
+			if r.Target.V == "*" {
+				perm.Target = PermissionTarget{Resource: ResourceAny, Patterns: []string{"*"}}
+			} else {
+				targetPatterns := strings.Split(r.Target.V, ":")
+				if len(targetPatterns) != 2 {
+					return nil, fmt.Errorf("invalid target: %s", r.Target.V)
+				}
+				resource, err := ResourceFromString(targetPatterns[0])
+				if err != nil {
+					return nil, err
+				}
+				perm.Target = PermissionTarget{Resource: resource}
+				for _, pat := range strings.Split(targetPatterns[1], ",") {
+					perm.Target.Patterns = append(perm.Target.Patterns, pat)
+				}
+			}
 		}
 
 		role.Permissions = append(role.Permissions, perm)
@@ -394,7 +424,9 @@ func (p Permission) MarshalText() ([]byte, error) {
 	buf.WriteString(strings.Join(namespaces, ","))
 
 	buf.WriteByte(':')
-	buf.WriteString(p.TargetPattern)
+	buf.WriteString(string(p.Target.Resource))
+	buf.WriteByte(':')
+	buf.WriteString(strings.Join(p.Target.Patterns, ","))
 
 	return buf.Bytes(), nil
 }
@@ -427,8 +459,13 @@ func (p *Permission) UnmarshalText(text []byte) error {
 		return errors.New("invalid permission: with 3 components, the third must be a wildcard")
 	}
 
+	var (
+		resource       Resource
+		targetPatterns []string
+	)
 	if len(parts) == 4 {
-		resource, err := ResourceFromString(string(parts[2]))
+		var err error
+		resource, err = ResourceFromString(string(parts[2]))
 		if err != nil {
 			return err
 		}
@@ -436,12 +473,21 @@ func (p *Permission) UnmarshalText(text []byte) error {
 		if string(parts[3]) == "" {
 			return errors.New("invalid permission: the fourth component must not be empty")
 		}
-		targetPattern = fmt.Sprintf("%s:%s", resource, parts[3])
+
+		if resource == ResourceAny && string(parts[3]) != "*" {
+			// It doesn't make sense to target specific objects if the resource
+			// is a wildcard.
+			return errors.New("invalid permission: the fourth component must be a wildcard if the resource is a wildcard")
+		}
+
+		for _, t := range strings.Split(string(parts[3]), ",") {
+			targetPatterns = append(targetPatterns, t)
+		}
 	}
 
 	p.Actions = actions
 	p.Namespaces = namespaces
-	p.TargetPattern = targetPattern
+	p.Target = PermissionTarget{Resource: resource, Patterns: targetPatterns}
 
 	return nil
 }

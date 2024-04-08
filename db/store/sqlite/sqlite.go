@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"regexp"
 
 	aerrors "go.hackfix.me/disco/app/errors"
@@ -227,8 +228,8 @@ func (s *Store) NewContext() context.Context {
 }
 
 // Init creates the database schema and initial records.
-func (s *Store) Init(appVersion string) error {
-	err := migrator.RunMigrations(s, s.migrations, migrator.MigrationUp, "all")
+func (s *Store) Init(appVersion string, logger *slog.Logger) error {
+	err := migrator.RunMigrations(s, s.migrations, migrator.MigrationUp, "all", logger)
 	if err != nil {
 		return err
 	}

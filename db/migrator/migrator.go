@@ -139,7 +139,10 @@ func loadHistory(d types.Querier, migrations []*Migration) error {
 
 // RunMigrations applies or rolls back migrations.
 // to can either be a migration name, or "all".
-func RunMigrations(d types.Querier, migrations []*Migration, typ MigrationType, to string) error {
+func RunMigrations(
+	d types.Querier, migrations []*Migration, typ MigrationType, to string,
+	logger *slog.Logger,
+) error {
 	ctx, cancel := context.WithCancel(d.NewContext())
 	defer cancel()
 	if err := createMigrationSchema(ctx, d); err != nil {
@@ -175,7 +178,7 @@ func RunMigrations(d types.Querier, migrations []*Migration, typ MigrationType, 
 		if err != nil {
 			return err
 		}
-		slog.Debug(fmt.Sprintf("%s DB migration", msg), "name", run.name)
+		logger.Debug(fmt.Sprintf("%s DB migration", msg), "name", run.name)
 	}
 
 	return nil

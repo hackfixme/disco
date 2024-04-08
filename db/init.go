@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"log/slog"
 
 	"github.com/mr-tron/base58"
 	"go.hackfix.me/disco/crypto"
@@ -16,8 +17,9 @@ import (
 // Init creates the database schema and initial records.
 func (d *DB) Init(
 	appVersion string, serverTLSCert, serverTLSKey []byte, serverTLSSAN string,
+	logger *slog.Logger,
 ) (localUser *models.User, err error) {
-	err = migrator.RunMigrations(d, d.migrations, migrator.MigrationUp, "all")
+	err = migrator.RunMigrations(d, d.migrations, migrator.MigrationUp, "all", logger)
 	if err != nil {
 		return nil, err
 	}

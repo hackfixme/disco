@@ -166,3 +166,54 @@ func TestAppUserInviteJoin(t *testing.T) {
 	h(assert.NoError(t, err))
 	h(assert.Equal(t, "testvalue", app2.stdout.String()))
 }
+
+func TestAppLogLevel(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name   string
+		args   []string
+		expLog string
+		expErr string
+	}{
+		{
+			name: "default",
+			args: []string{"init"},
+		},
+		{
+			name:   "debug",
+			args:   []string{"--log-level=debug", "init"},
+			expLog: "applied DB migration",
+		},
+		{
+			name:   "invalid",
+			args:   []string{"--log-level=invalid", "init"},
+			expErr: `--log-level: slog: level string "invalid": unknown name`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			tctx, cancel, h := newTestContext(t, 3*time.Second)
+			defer cancel()
+
+			app, err := newTestApp(tctx)
+			h(assert.NoError(t, err))
+
+			err = app.Run(tc.args...)
+			if tc.expErr != "" {
+				h(assert.EqualError(t, err, tc.expErr))
+			} else {
+				h(assert.NoError(t, err))
+			}
+
+			if tc.expLog != "" {
+				h(assert.Contains(t, app.stderr.String(), tc.expLog))
+			} else {
+				h(assert.Equal(t, "", app.stderr.String()))
+			}
+		})
+	}
+}

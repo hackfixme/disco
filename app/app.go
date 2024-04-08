@@ -26,6 +26,9 @@ type App struct {
 	ctx  *actx.Context
 	cli  *cli.CLI
 	args []string
+	// the logging level is set via the CLI, if the app was initialized with the
+	// WithLogger option.
+	logLevel *slog.LevelVar
 }
 
 // New initializes a new application with the given options. dataDir specifies
@@ -64,6 +67,11 @@ func New(dataDir string, opts ...Option) (*App, error) {
 func (app *App) Run(args []string) error {
 	if err := app.cli.Parse(args); err != nil {
 		return err
+	}
+
+	if app.logLevel != nil {
+		app.logLevel.Set(app.cli.Log.Level)
+		slog.SetLogLoggerLevel(app.cli.Log.Level)
 	}
 
 	if err := app.createDataDir(app.cli.DataDir); err != nil {

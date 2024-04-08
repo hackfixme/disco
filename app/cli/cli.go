@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"log/slog"
 	"strings"
 
 	"github.com/alecthomas/kong"
@@ -26,6 +27,9 @@ type CLI struct {
 
 	DataDir       string `kong:"default='${dataDir}',help='Directory to store Disco data in.'"`
 	EncryptionKey string `kong:"help='32-byte private key used for encrypting and decrypting the local data store, encoded in base 58. '"`
+	Log           struct {
+		Level slog.Level `enum:"DEBUG,INFO,WARN,ERROR" default:"INFO" help:"Set the app logging level."`
+	} `embed:"" prefix:"log-"`
 }
 
 // New initializes the command-line interface.

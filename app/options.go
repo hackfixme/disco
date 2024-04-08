@@ -50,13 +50,16 @@ func WithFS(fs vfs.FileSystem) Option {
 // WithLogger initializes the logger used by the application.
 func WithLogger(isStdoutTTY, isStderrTTY bool) Option {
 	return func(app *App) {
+		lvl := &slog.LevelVar{}
+		lvl.Set(slog.LevelInfo)
 		logger := slog.New(
 			tint.NewHandler(app.ctx.Stderr, &tint.Options{
-				Level:      slog.LevelDebug, // TODO: Make configurable
+				Level:      lvl,
 				NoColor:    !isStderrTTY,
 				TimeFormat: "2006-01-02 15:04:05.000",
 			}),
 		)
+		app.logLevel = lvl
 		app.ctx.Logger = logger
 		slog.SetDefault(logger)
 	}

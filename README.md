@@ -20,3 +20,5 @@ It allows securely storing and retrieving arbitrary data locally, and serving it
 See the [docs directory](/docs).
 
 ## License
+
+[AGPLv3](/LICENSE.md)

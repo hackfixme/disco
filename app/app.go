@@ -54,7 +54,7 @@ func New(dataDir string, opts ...Option) (*App, error) {
 	}
 	app.ctx.UUIDGen = uuidgen
 
-	app.cli, err = cli.New(dataDir)
+	app.cli, err = cli.New(dataDir, app.ctx.Version)
 	if err != nil {
 		return nil, err
 	}

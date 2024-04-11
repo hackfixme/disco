@@ -25,15 +25,16 @@ type CLI struct {
 	Invite Invite `kong:"cmd,help='Manage invitations for remote users.'"`
 	Remote Remote `kong:"cmd,help='Manage remote Disco nodes.'"`
 
-	DataDir       string `kong:"default='${dataDir}',help='Directory to store Disco data in.'"`
-	EncryptionKey string `kong:"help='32-byte private key used for encrypting and decrypting the local data store, encoded in base 58. '"`
+	Version       kong.VersionFlag `kong:"help='Output Disco version and exit.'"`
+	DataDir       string           `kong:"default='${dataDir}',help='Directory to store Disco data in.'"`
+	EncryptionKey string           `kong:"help='32-byte private key used for encrypting and decrypting the local data store, encoded in base 58. '"`
 	Log           struct {
 		Level slog.Level `enum:"DEBUG,INFO,WARN,ERROR" default:"INFO" help:"Set the app logging level."`
 	} `embed:"" prefix:"log-"`
 }
 
 // New initializes the command-line interface.
-func New(dataDir string) (*CLI, error) {
+func New(dataDir, version string) (*CLI, error) {
 	c := &CLI{}
 	kparser, err := kong.New(c,
 		kong.Name("disco"),
@@ -44,7 +45,10 @@ func New(dataDir string) (*CLI, error) {
 			Summary:             true,
 			NoExpandSubcommands: true,
 		}),
-		kong.Vars{"dataDir": dataDir},
+		kong.Vars{
+			"dataDir": dataDir,
+			"version": version,
+		},
 	)
 	if err != nil {
 		return nil, err

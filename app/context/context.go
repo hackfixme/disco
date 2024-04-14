@@ -24,23 +24,27 @@ import (
 // the application to avoid direct dependencies on external systems, and make
 // testing easier.
 type Context struct {
-	Ctx         context.Context
-	Version     string // The static app version in the binary
-	VersionInit string // The app version the DB was initialized with
-	FS          vfs.FileSystem
-	DataDir     string
-	Env         Environment
-	Logger      *slog.Logger
-	UUIDGen     func() string
+	Ctx     context.Context // global context
+	FS      vfs.FileSystem  // filesystem
+	DataDir string          // app data storage directory
+	Env     Environment     // process environment
+	Logger  *slog.Logger    // global logger
+	UUIDGen func() string   // UUID generator
 
 	// Standard streams
 	Stdin  io.Reader
 	Stdout io.Writer
 	Stderr io.Writer
 
+	// Stores
 	DB    *db.DB
 	Store store.Store
-	User  *models.User
+	User  *models.User // current app user
+
+	// Metadata
+	Version     string // short semantic app version
+	VersionFull string // app version including Go runtime information
+	VersionInit string // app version the DB was initialized with
 }
 
 // Environment is the interface to the process environment.

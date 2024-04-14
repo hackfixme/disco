@@ -25,9 +25,6 @@ type User struct {
 		Name  string   `arg:"" help:"The unique name of the user."`
 		Roles []string `help:"Names of roles to assign to this user. \n Any existing roles will be removed and replaced with this set."`
 	} `kong:"cmd,help='Update the configuration of a user.'"`
-	Invite struct {
-		Name string `arg:"" help:"The unique name of the user."`
-	} `kong:"cmd,help='Create an invitation token for a user.'"`
 	Ls struct {
 	} `kong:"cmd,help='List users.'"`
 }
@@ -89,7 +86,6 @@ func (c *User) Run(kctx *kong.Context, appCtx *actx.Context) error {
 				"user '%s' has no assigned roles and won't be able to "+
 					"access any resources", c.Update.Name))
 		}
-	case "invite":
 	case "ls":
 		users, err := models.Users(dbCtx, appCtx.DB,
 			// Local users are hidden for now.

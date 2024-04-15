@@ -20,7 +20,7 @@ They consist of two concepts: actions and targets.
 **Actions** dictate _how_ resources can be accessed. There are 3 possible actions:
 - `read` (`r`): allows reading resource data.
 - `write` (`w`): allows writing resource data, including creating new data.
-- `delete` (`d**): allows deleting resource data.
+- `delete` (`d`): allows deleting resource data.
 
 **Targets** dictate _which_ objects that are part of the resource can be accessed. They can be granular and specific to a single key or object within the resource, or global for all objects, or even all resources. Targets are specified as `<resource>:<pattern>`.
 
@@ -41,12 +41,30 @@ Roles are a collection of permissions, assigned to one or more users.
 | user  | *          | *       | store:* |
 
 These roles are created by default when running `disco init`.
+
 The `admin` role allows any action, on any target, in any namespace. This role is assigned to the local CLI user, but be careful with assigning it to any remote users, as it effectively gives unrestricted access to all data on the node.
+
 The `node` role allows reading any store data in any namespace. This is a generic role that can be used for remote nodes that only need read permissions. It would be more secure to add more restrictive roles with a granular target for specific keys or key hierarchies instead.
+
 The `user` role allows any action on any store data in any namespace. This is a generic role for users that can manage store data, but as with the `node` role, it would be more secure to create a more granular role.
 
 
 ## Custom roles
+
+The `role add` command allows adding roles with custom permissions.
+
+The syntax for defining role permissions is:
+```
+<actions>:<namespaces>:<resource>:<target>
+```
+Where:
+- `actions` is a combination of `r` (read), `w` (write/create), and `d` (delete).
+- `namespaces` is one or more comma-separated list of namespaces, or `*` to apply for all namespaces.
+- `resource` is one of `store`, `user`, `role` or `invite`.
+- `target` is a comma-separated list of objects unique for each resource.
+
+
+### Examples
 
 - ```sh
   disco role add myrole 'rwd:dev,prod:store:app1/*,app2/value'

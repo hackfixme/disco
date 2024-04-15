@@ -16,7 +16,6 @@ It allows securely storing and retrieving arbitrary data locally, and serving it
 - Data is encrypted at rest and in transit using modern cryptography (NaCl, TLS 1.3).
 - Flexible authorization using role-based access control.
 - Namespacing support for separating environments (development, staging, production, etc.).
-- Granular subscribe/notify support of data changes ([coming soon!](https://github.com/hackfixme/disco/issues/3)).
 - Cross-platform: runs on Linux, macOS and Windows.
 
 You can see planned work on the [roadmap](https://github.com/orgs/hackfixme/projects/1/views/1). Please vote on issues by giving them a :thumbsup:.

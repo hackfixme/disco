@@ -1,0 +1,21 @@
+name: "disco"
+arch: "${GOARCH}"
+platform: "linux"
+version: "${VERSION}"
+version_schema: semver
+section: "default"
+maintainer: "hackFIXME"
+description: |
+  A distributed configuration and secrets manager.
+depends:
+- ca-certificates
+homepage: "https://go.hackfix.me/disco"
+license: "AGPL-3.0"
+contents:
+- src: ./disco
+  dst: /usr/bin/disco
+
+deb:
+  compression: xz
+  fields:
+    Bugs: https://github.com/hackfixme/disco/issues

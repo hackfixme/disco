@@ -36,12 +36,12 @@ func (c *Init) Run(appCtx *actx.Context) error {
 		return fmt.Errorf("failed generating the server TLS certificate: %w", err)
 	}
 
-	appCtx.User, err = appCtx.DB.Init(appCtx.Version, tlsCert, tlsPrivKey, rndSAN, appCtx.Logger)
+	appCtx.User, err = appCtx.DB.Init(appCtx.Version.Semantic, tlsCert, tlsPrivKey, rndSAN, appCtx.Logger)
 	if err != nil {
 		return aerrors.NewRuntimeError("failed initializing database", err, "")
 	}
 
-	if err = appCtx.Store.Init(appCtx.Version, appCtx.Logger); err != nil {
+	if err = appCtx.Store.Init(appCtx.Version.Semantic, appCtx.Logger); err != nil {
 		return aerrors.NewRuntimeError("failed initializing store", err, "")
 	}
 

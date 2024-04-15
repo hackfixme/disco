@@ -17,7 +17,7 @@ import (
 func main() {
 	// NOTE: The order of the passed options is significant, as some options
 	// depend on the values set by previous ones.
-	a, err := app.New(filepath.Join(xdg.DataHome, "disco"),
+	a, err := app.New("Disco", filepath.Join(xdg.DataHome, "disco"),
 		app.WithFDs(
 			os.Stdin,
 			colorable.NewColorable(os.Stdout),

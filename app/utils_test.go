@@ -74,7 +74,7 @@ func newTestApp(ctx context.Context, options ...Option) (*testApp, error) {
 		WithUser(localUser),
 	}
 	opts = append(opts, options...)
-	app, err := New("/disco", opts...)
+	app, err := New("Disco", "/disco", opts...)
 	if err != nil {
 		return nil, err
 	}

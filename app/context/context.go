@@ -42,8 +42,7 @@ type Context struct {
 	User  *models.User // current app user
 
 	// Metadata
-	Version     string // short semantic app version
-	VersionFull string // app version including Go runtime information
+	Version     *VersionInfo
 	VersionInit string // app version the DB was initialized with
 }
 

@@ -23,6 +23,7 @@ import (
 
 // App is the application.
 type App struct {
+	name string
 	ctx  *actx.Context
 	cli  *cli.CLI
 	args []string
@@ -35,13 +36,17 @@ type App struct {
 // the directory where application data will be stored, though this can be
 // overriden with the DISCO_DATA_DIR environment variable, and --data-dir CLI
 // flag.
-func New(dataDir string, opts ...Option) (*App, error) {
+func New(name, dataDir string, opts ...Option) (*App, error) {
+	version, err := actx.GetVersion()
+	if err != nil {
+		return nil, err
+	}
 	defaultCtx := &actx.Context{
 		Ctx:     context.Background(),
 		Logger:  slog.Default(),
 		Version: version,
 	}
-	app := &App{ctx: defaultCtx}
+	app := &App{name: name, ctx: defaultCtx}
 
 	for _, opt := range opts {
 		opt(app)
@@ -54,7 +59,8 @@ func New(dataDir string, opts ...Option) (*App, error) {
 	}
 	app.ctx.UUIDGen = uuidgen
 
-	app.cli, err = cli.New(dataDir, app.ctx.Version)
+	ver := fmt.Sprintf("%s %s", app.name, app.ctx.Version.String())
+	app.cli, err = cli.New(dataDir, ver)
 	if err != nil {
 		return nil, err
 	}

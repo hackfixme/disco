@@ -2,22 +2,45 @@
 
 Disco is a distributed configuration and secrets manager.
 
-It allows securely storing and retrieving arbitrary data locally, and serving it to authorized clients.
+It allows securely storing and retrieving arbitrary data locally, and serving it to authorized remote clients.
+
+> [!WARNING]
+> The project is in early development, so expect bugs and missing features.
+> It is usable in its current state, but please report any issues [here](https://github.com/hackfixme/disco/issues).
+
 
 ## Features
 
-- Data is encrypted at rest and in transit using modern encryption.
-- Simple and intuitive command-line interface.
-- Simple deployments; just a single binary.
-- Simple client authentication using mTLS.
+- User-friendly command-line interface.
+- Single-binary deployments.
+- Data is encrypted at rest and in transit using modern cryptography (NaCl, TLS 1.3).
 - Flexible authorization using role-based access control.
-- Granular subscribe/notify support of data changes.
-- Namespace support for e.g. different environments (development, staging, production).
+- Namespacing support for separating environments (development, staging, production, etc.).
+- Granular subscribe/notify support of data changes ([coming soon!](https://github.com/hackfixme/disco/issues/3)).
 - Cross-platform: runs on Linux, macOS and Windows.
+
+You can see planned work on the [roadmap](https://github.com/orgs/hackfixme/projects/1/views/1). Please vote on issues by giving them a :thumbsup:.
+
+
+## Installation
+
+The easiest way to install Disco is by downloading one of the pre-built packages from the latest release on the [releases page](https://github.com/hackfixme/disco/releases). Unpack the `disco` binary and place it somewhere on your `$PATH`.
+
+Alternatively, you can build a binary for your system.
+
+First, ensure [Git](https://github.com/git-guides/install-git) and [Go](https://golang.org/doc/install) are installed. Go must be version 1.22 and later.
+
+Then in a terminal run:
+
+```sh
+go install go.hackfix.me/disco@latest
+```
+
 
 ## Documentation
 
-See the [docs directory](/docs).
+For usage instructions, details about the internals, and other information, see the [documentation](/docs).
+
 
 ## License
 

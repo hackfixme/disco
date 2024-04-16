@@ -39,7 +39,6 @@ func New(dataDir string) (*CLI, error) {
 		kong.Name("disco"),
 		kong.UsageOnError(),
 		kong.DefaultEnvars("DISCO"),
-		kong.Exit(func(int) {}),
 		kong.ConfigureHelp(kong.HelpOptions{
 			Compact:             true,
 			Summary:             true,

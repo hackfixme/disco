@@ -63,6 +63,20 @@ func TestAppStore(t *testing.T) {
 			"            key2        \n" +
 			"dev         myapp/key   \n"
 		h(assert.Equal(t, want, app.stdout.String()))
+
+		err = app.Run("ls", "app")
+		h(assert.NoError(t, err))
+		h(assert.Equal(t, "", app.stdout.String()))
+
+		err = app.Run("ls", "key")
+		h(assert.NoError(t, err))
+		h(assert.Equal(t, "key\nkey2\n", app.stdout.String()))
+
+		err = app.Run("ls", "--namespace=*", "myapp")
+		h(assert.NoError(t, err))
+		want = "NAMESPACE   KEY       \n" +
+			"dev         myapp/key   \n"
+		h(assert.Equal(t, want, app.stdout.String()))
 	})
 
 	t.Run("ok/rm_ls", func(t *testing.T) {

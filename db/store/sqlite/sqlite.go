@@ -17,6 +17,7 @@ import (
 	"go.hackfix.me/disco/db/migrator"
 	"go.hackfix.me/disco/db/queries"
 	"go.hackfix.me/disco/db/store"
+	"go.hackfix.me/disco/db/types"
 )
 
 //go:embed migrations/*.sql
@@ -180,10 +181,18 @@ func (s *Store) List(namespace, keyPrefix string) (map[string][]string, error) {
 
 	keysPerNS := make(map[string][]string)
 
+	filter := types.NewFilter("1=1", []any{})
+	if keyPrefix != "" {
+		filter = types.NewFilter("key LIKE ? || '%'", []any{keyPrefix})
+	}
+
 	listNamespace := func(ns string) error {
-		rows, err := s.QueryContext(s.ctx, fmt.Sprintf(`SELECT key
+		query := fmt.Sprintf(
+			`SELECT key
 			FROM "%s"
-			ORDER BY key ASC`, ns))
+			WHERE %s
+			ORDER BY key ASC`, ns, filter.Where)
+		rows, err := s.QueryContext(s.ctx, query, filter.Args...)
 		if err != nil {
 			return err
 		}

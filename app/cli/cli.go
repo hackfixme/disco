@@ -27,7 +27,7 @@ type CLI struct {
 
 	Version       kong.VersionFlag `kong:"help='Output Disco version and exit.'"`
 	DataDir       string           `kong:"default='${dataDir}',help='Directory to store Disco data in.'"`
-	EncryptionKey string           `kong:"help='32-byte private key used for encrypting and decrypting the local data store, encoded in base 58. '"`
+	EncryptionKey string           `kong:"help='Private key used for encrypting and decrypting the local data store. '"`
 	Log           struct {
 		Level slog.Level `enum:"DEBUG,INFO,WARN,ERROR" default:"INFO" help:"Set the app logging level."`
 	} `embed:"" prefix:"log-"`

@@ -32,7 +32,7 @@ First, ensure [Git](https://github.com/git-guides/install-git) and [Go](https://
 Then in a terminal run:
 
 ```sh
-go install go.hackfix.me/disco@latest
+go install go.hackfix.me/disco/cmd/disco@latest
 ```
 
 

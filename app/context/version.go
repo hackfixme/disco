@@ -57,6 +57,10 @@ func GetVersion() (*VersionInfo, error) {
 
 // String returns the full version information.
 func (vi *VersionInfo) String() string {
+	if vi.Commit == "" {
+		return fmt.Sprintf("v%s (%s)", vi.Semantic, vi.goInfo)
+	}
+
 	var distance string
 	if vi.TagDistance > 0 {
 		distance = fmt.Sprintf("-%d", vi.TagDistance)

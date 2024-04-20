@@ -2,3 +2,5 @@
 .env
 /disco
 /dist
+/*.txt
+*.log

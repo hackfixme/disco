@@ -134,8 +134,8 @@ publish-oci:
     SET latest="true"
   END
   ARG EARTHLY_GIT_BRANCH
-  IF [ "$EARTHLY_GIT_BRANCH" = "main" ]
-    BUILD +build-oci --tags="$EARTHLY_GIT_BRANCH $gitTag" --latest="$latest"
+  IF [ "$EARTHLY_GIT_BRANCH" = "main" ] || [ -n "$gitTag" ]
+    BUILD +build-oci --tags="main $gitTag" --latest="$latest"
   END
 
 

@@ -25,6 +25,13 @@ You can see planned work on the [roadmap](https://github.com/orgs/hackfixme/proj
 
 The easiest way to install Disco is by downloading one of the pre-built packages from the latest release on the [releases page](https://github.com/hackfixme/disco/releases). Unpack the `disco` binary and place it somewhere on your `$PATH`.
 
+Container images are also available on [Docker Hub](https://hub.docker.com/r/hackfixme/disco). Stable releases are published with version tags, e.g. `0.1.0`, and are also tagged with `latest`. Unstable releases track the `main` branch and are tagged with `main`.
+
+To pull and run the latest stable release:
+```sh
+docker run --rm -it hackfixme/disco --version
+```
+
 Alternatively, you can build a binary for your system.
 
 First, ensure [Git](https://github.com/git-guides/install-git) and [Go](https://golang.org/doc/install) are installed. Go must be version 1.22 and later.

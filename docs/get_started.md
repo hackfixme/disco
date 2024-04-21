@@ -1,4 +1,4 @@
-# Getting Started Guide
+# Getting started
 
 After you've [installed Disco](/README.md#installation), confirm the version you installed by running:
 
@@ -48,8 +48,8 @@ Most Disco commands require the encryption key to read and write data. You can p
 > Be aware that on Linux the CLI arguments and process environment can be read by any
 > other process run by the same user via the `/proc` filesystem, which means another
 > process could read the Disco encryption key. If this is a concern for your use
-> case, consider running Disco from a container instead (an official OCI image will
-> be provided soon), or another isolation mechanism.
+> case, consider [running Disco inside a container instead](https://hub.docker.com/r/hackfixme/disco),
+> or using another isolation mechanism (e.g. a virtual machine).
 >
 > Also, be careful with your shell history. Depending on your shell configuration,
 > the Disco encryption key could be stored in your shell history. If using the

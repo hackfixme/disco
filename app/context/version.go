@@ -11,7 +11,7 @@ import (
 
 // The semantic version of the application.
 // This can be overriden by vcsVersion.
-const version = "0.0.0"
+const version = "0.1.0"
 
 var (
 	vcsVersion string // version from VCS set at build time

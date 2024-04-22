@@ -1,7 +1,9 @@
 package app
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -10,11 +12,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mandelsoft/vfs/pkg/vfs"
 	"github.com/nrednav/cuid2"
 
 	"go.hackfix.me/disco/app/cli"
 	actx "go.hackfix.me/disco/app/context"
 	aerrors "go.hackfix.me/disco/app/errors"
+	"go.hackfix.me/disco/crypto"
 	"go.hackfix.me/disco/db"
 	"go.hackfix.me/disco/db/queries"
 	"go.hackfix.me/disco/db/store"
@@ -89,8 +93,30 @@ func (app *App) Run(args []string) error {
 		// so prevent it by using SQLite's in-memory support.
 		storeDir = ":memory:"
 	}
-	if err := app.initStores(storeDir); err != nil {
+
+	var encKey *[32]byte
+	if app.ctx.User != nil {
+		encKey = app.ctx.User.PrivateKey
+	}
+	cmd := app.cli.Command()
+	// Only read the encryption for specific commands.
+	encKeyCommands := []string{"get", "set", "ls", "serve", "invite user", "remote add"}
+	if encKey == nil && slices.Contains(encKeyCommands, cmd) {
+		var err error
+		encKey, err = app.readEncryptionKey()
+		if err != nil {
+			return aerrors.NewRuntimeError("invalid encryption key", err, "")
+		}
+	}
+
+	if err := app.initStores(storeDir, encKey); err != nil {
 		return err
+	}
+
+	if app.ctx.User == nil && cmd != "init" {
+		if err := app.ctx.LoadLocalUser(encKey); err != nil {
+			return err
+		}
 	}
 
 	if err := app.cli.Execute(app.ctx); err != nil {
@@ -98,6 +124,24 @@ func (app *App) Run(args []string) error {
 	}
 
 	return nil
+}
+
+func (app *App) readEncryptionKey() (*[32]byte, error) {
+	encKey, err := crypto.DecodeKey(app.cli.EncryptionKey)
+	if err != nil {
+		// Maybe it's a file path
+		encKeyData, fsErr := vfs.ReadFile(app.ctx.FS, app.cli.EncryptionKey)
+		if fsErr != nil {
+			// Unwrap error to avoid potentially logging a secret.
+			return nil, errors.Unwrap(fsErr)
+		}
+		encKey, err = crypto.DecodeKey(string(bytes.TrimSpace(encKeyData)))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return encKey, nil
 }
 
 func (app *App) createDataDir(dir string) error {
@@ -109,7 +153,9 @@ func (app *App) createDataDir(dir string) error {
 	return nil
 }
 
-func (app *App) initStores(dataDir string) error {
+// TODO: Remove encryption key from here. Instead load it only when needed,
+// to minimize the amount of time it's stored in RAM.
+func (app *App) initStores(dataDir string, encKey *[32]byte) error {
 	var err error
 	if app.ctx.DB == nil {
 		app.ctx.DB, err = initDB(app.ctx.Ctx, dataDir)
@@ -123,25 +169,7 @@ func (app *App) initStores(dataDir string) error {
 		app.ctx.VersionInit = version.V
 	}
 
-	// Only load the local user if it's not set and we're currrently not
-	// initializing. If we're initializing, the migrations haven't been run at
-	// this point, so the schema doesn't exist yet.
-	cmd := app.cli.Command()
-	if app.ctx.User == nil && cmd != "init" {
-		// The encryption key is only required for specific commands.
-		encKeyCommands := []string{"get", "set", "ls", "serve", "invite user", "remote add"}
-		readEncKey := slices.Contains(encKeyCommands, cmd)
-		err = app.ctx.LoadLocalUser(readEncKey)
-		if err != nil {
-			return err
-		}
-	}
-
 	if app.ctx.Store == nil {
-		var encKey *[32]byte
-		if app.ctx.User != nil {
-			encKey = app.ctx.User.PrivateKey
-		}
 		app.ctx.Store, err = initKVStore(app.ctx.Ctx, dataDir, encKey)
 		if err != nil {
 			return err

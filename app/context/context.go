@@ -52,12 +52,11 @@ type Environment interface {
 	Set(string, string) error
 }
 
-// LoadLocalUser loads the local user from the database into c.User.
-// If readEncKey is true, it also reads the private encryption key from the
-// environment and validates it against its stored hash.
+// LoadLocalUser loads the local user from the database into c.User,
+// optionally validating the provided encryption key with the stored hash.
 // Note that this *must* load a single user. Currently only a single local user
 // is created, but in the future this might change.
-func (c *Context) LoadLocalUser(readEncKey bool) error {
+func (c *Context) LoadLocalUser(encKey *[32]byte) error {
 	users, err := models.Users(c.DB.NewContext(), c.DB,
 		types.NewFilter("u.type = ?", []any{models.UserTypeLocal}))
 	if err != nil {
@@ -75,26 +74,20 @@ func (c *Context) LoadLocalUser(readEncKey bool) error {
 			fmt.Sprintf("found more than 1 local user: %d", len(users)), nil, "")
 	}
 
-	if readEncKey {
+	if encKey != nil {
 		privKeyHash, privKeyErr := queries.GetEncryptionPrivKeyHash(c.DB.NewContext(), c.DB)
 		if privKeyErr != nil || !privKeyHash.Valid {
 			return aerrors.NewRuntimeError("missing encryption key hash",
 				privKeyErr, "Did you forget to run 'disco init'?")
 		}
 
-		privKeyEnc := c.Env.Get("DISCO_ENCRYPTION_KEY")
-		privKey, err := crypto.DecodeKey(privKeyEnc)
-		if err != nil {
-			return aerrors.NewRuntimeError("invalid encryption key", err, "")
-		}
-
-		inPrivKeyHash := crypto.Hash("encryption key hash", privKey[:])
+		inPrivKeyHash := crypto.Hash("encryption key hash", encKey[:])
 		inPrivKeyHashEnc := base58.Encode(inPrivKeyHash)
 		if privKeyHash.V != inPrivKeyHashEnc {
 			return aerrors.NewRuntimeError("invalid encryption key", errors.New("hash mismatch"), "")
 		}
 
-		c.User.PrivateKey = privKey
+		c.User.PrivateKey = encKey
 	}
 
 	return nil

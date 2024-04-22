@@ -25,9 +25,10 @@ type CLI struct {
 	Invite Invite `kong:"cmd,help='Manage invitations for remote users.'"`
 	Remote Remote `kong:"cmd,help='Manage remote Disco nodes.'"`
 
-	Version       kong.VersionFlag `kong:"help='Output Disco version and exit.'"`
-	DataDir       string           `kong:"default='${dataDir}',help='Directory to store Disco data in.'"`
-	EncryptionKey string           `kong:"help='Private key used for encrypting and decrypting the local data store. '"`
+	Version kong.VersionFlag `kong:"help='Output Disco version and exit.'"`
+	DataDir string           `kong:"default='${dataDir}',help='Directory to store Disco data in.'"`
+	//nolint:lll
+	EncryptionKey string `kong:"help='Private key used for encrypting and decrypting the local data store. \n It can be the value itself or a file path that contains the value. '"`
 	Log           struct {
 		Level slog.Level `enum:"DEBUG,INFO,WARN,ERROR" default:"INFO" help:"Set the app logging level."`
 	} `embed:"" prefix:"log-"`

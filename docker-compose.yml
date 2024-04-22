@@ -1,0 +1,21 @@
+name: disco
+
+services:
+  disco:
+    image: hackfixme/disco:${DISCO_IMAGE_TAG:-latest}
+    environment:
+      DISCO_ENCRYPTION_KEY: /run/secrets/disco_key
+    ports:
+      - "2020:2020"
+    secrets:
+      - disco_key
+    volumes:
+      - disco:/opt/disco
+
+volumes:
+  disco:
+    external: true
+
+secrets:
+  disco_key:
+    external: true

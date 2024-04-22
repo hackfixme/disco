@@ -78,40 +78,18 @@ build:
 
 build-oci-linux-amd64:
   BUILD +build
-  ARG tags="latest"
-  ARG latest=""
 
-  FROM --platform=linux/amd64 ubuntu:24.04
-  ENV DEBIAN_FRONTEND=noninteractive
-  RUN apt-get update && apt-get install -y ca-certificates
+  FROM DOCKERFILE --platform=linux/amd64 .
   COPY +build/dist/disco-*-linux-amd64/disco /usr/local/bin/
   ENTRYPOINT ["/usr/local/bin/disco"]
-
-  FOR tag IN "$tags"
-    SAVE IMAGE --push hackfixme/disco:"$tag"
-  END
-  IF [ -n "$latest" ]
-    SAVE IMAGE --push hackfixme/disco:latest
-  END
 
 
 build-oci-linux-arm64:
   BUILD +build
-  ARG tags="latest"
-  ARG latest=""
 
-  FROM --platform=linux/arm64 ubuntu:24.04
-  ENV DEBIAN_FRONTEND=noninteractive
-  RUN apt-get update && apt-get install -y ca-certificates
+  FROM DOCKERFILE --platform=linux/arm64 .
   COPY +build/dist/disco-*-linux-arm64/disco /usr/local/bin/
   ENTRYPOINT ["/usr/local/bin/disco"]
-
-  FOR tag IN "$tags"
-    SAVE IMAGE --push hackfixme/disco:"$tag"
-  END
-  IF [ -n "$latest" ]
-    SAVE IMAGE --push hackfixme/disco:latest
-  END
 
 
 build-oci:
@@ -119,8 +97,20 @@ build-oci:
   FROM +build
   ARG tags="latest"
   ARG latest=""
-  BUILD +build-oci-linux-amd64 --tags="$tags" --latest="$latest"
-  BUILD +build-oci-linux-arm64 --tags="$tags" --latest="$latest"
+
+  FOR tag IN "$tags"
+    FROM +build-oci-linux-amd64
+    SAVE IMAGE --push hackfixme/disco:"$tag"
+    FROM +build-oci-linux-arm64
+    SAVE IMAGE --push hackfixme/disco:"$tag"
+  END
+  FROM busybox
+  IF [ -n "$latest" ]
+    FROM +build-oci-linux-amd64
+    SAVE IMAGE --push hackfixme/disco:latest
+    FROM +build-oci-linux-arm64
+    SAVE IMAGE --push hackfixme/disco:latest
+  END
 
 
 publish-oci:

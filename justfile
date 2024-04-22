@@ -20,12 +20,12 @@ clean:
 lint report="":
   #!/usr/bin/env sh
   if [ -z '{{report}}' ]; then
-    golangci-lint run --out-format=tab --new-from-rev=e72df147cd ./...
+    golangci-lint run --timeout 5m --out-format=tab --new-from-rev=e72df147cd ./...
     exit $?
   fi
 
   _report_id="$(date '+%Y%m%d')-$(git describe --tags --abbrev=10 --always)"
-  golangci-lint run --out-format=tab --issues-exit-code=0 ./... | \
+  golangci-lint run --timeout 5m --out-format=tab --issues-exit-code=0 ./... | \
     tee "golangci-lint-${_report_id}.txt" | \
       awk 'NF {if ($2 == "revive") print $2 ":" $3; else print $2}' \
       | sort | uniq -c | sort -nr \

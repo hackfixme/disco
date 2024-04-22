@@ -13,6 +13,8 @@ Welcome to the Disco documentation!
 - [Getting started guide](./get_started.md): a short guide to using Disco.
   New users should start here.
 
+- [Container usage](./container.md): tutorial for using Disco inside a Linux container.
+
 - [System](./system.md): system architecture and behavior.
 
 - [Roles](./roles.md): role-based access control features.

@@ -18,7 +18,7 @@ It allows securely storing and retrieving arbitrary data locally, and serving it
 - Namespacing support for separating environments (development, staging, production, etc.).
 - Cross-platform: runs on Linux, macOS and Windows.
 
-You can see planned work on the [roadmap](https://github.com/orgs/hackfixme/projects/1/views/1). Please vote on issues by giving them a :thumbsup:.
+You can see planned work on the [milestones page](https://github.com/hackfixme/disco/milestones?direction=asc&sort=title&state=open). Please vote on issues by giving them a :thumbsup:.
 
 
 ## Installation
@@ -32,9 +32,11 @@ To pull and run the latest stable release:
 docker run --rm -it hackfixme/disco --version
 ```
 
+See the [container usage page](./docs/container.md) for workflow suggestions.
+
 Alternatively, you can build a binary for your system.
 
-First, ensure [Git](https://github.com/git-guides/install-git) and [Go](https://golang.org/doc/install) are installed. Go must be version 1.22 and later.
+First, ensure [Git](https://github.com/git-guides/install-git) and [Go](https://golang.org/doc/install) are installed. Go must be version 1.22 or later.
 
 Then in a terminal run:
 
